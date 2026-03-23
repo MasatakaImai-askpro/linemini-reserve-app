@@ -1,6 +1,44 @@
+# 依存関係
 node_modules
+
+# ビルド成果物
 dist
+
+# OS生成ファイル
 .DS_Store
-server/public
+Thumbs.db
+
+# エディタ・IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# 環境変数
+.env
+.env.local
+.env.development
+.env.production
+
+# ログ
+logs
+*.log
+npm-debug.log*
+
+# アップロードファイル（ローカルのみ）
+server/uploads/
+
+# Vite
 vite.config.ts.*
+server/public
+
+# ビルドアーカイブ
 *.tar.gz
+
+# Drizzle（生成ファイル）
+drizzle/
+
+# ローカル環境設定
+docker-compose.yml

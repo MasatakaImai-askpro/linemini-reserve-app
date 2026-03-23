@@ -1,14 +1,19 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertShopSchema, insertCouponSchema } from "@shared/schema";
-import { bookingManager } from "./booking-store";
+import {
+  insertShopSchema,
+  insertCouponSchema,
+  insertStoreStaffSchema,
+  insertStoreServiceSchema,
+  insertStoreSlotSchema,
+  insertReservationSchema,
+} from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 import express from "express";
-import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
-import { WebhookHandlers } from "./webhookHandlers";
+import { nanoid } from "nanoid";
 
 const uploadsDir = path.join(process.cwd(), "server", "uploads");
 fs.mkdirSync(uploadsDir, { recursive: true });
@@ -43,21 +48,61 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
   app.use("/uploads", express.static(uploadsDir, {
     setHeaders: (res) => {
       res.setHeader("X-Content-Type-Options", "nosniff");
     },
   }));
 
+  // ─────────────────────────────
+  // 画像アップロード
+  // ─────────────────────────────
   app.post("/api/upload", upload.single("image"), (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: "No image file provided" });
     }
     res.json({ url: `/uploads/${req.file.filename}` });
   });
-  app.get("/api/shops", async (_req, res) => {
+
+  // ─────────────────────────────
+  // エリア
+  // ─────────────────────────────
+  app.get("/api/areas", async (_req, res) => {
     try {
-      const shops = await storage.getShops();
+      const areas = await storage.getAreas();
+      res.json(areas);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch areas" });
+    }
+  });
+
+  // ─────────────────────────────
+  // カテゴリ
+  // ─────────────────────────────
+  app.get("/api/categories", async (_req, res) => {
+    try {
+      const categories = await storage.getCategories();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch categories" });
+    }
+  });
+
+  // ─────────────────────────────
+  // 店舗
+  // ─────────────────────────────
+  app.get("/api/shops", async (req, res) => {
+    try {
+      const { areaId, categoryId } = req.query;
+      let shops;
+      if (areaId) {
+        shops = await storage.getShopsByAreaId(parseInt(areaId as string));
+      } else if (categoryId) {
+        shops = await storage.getShopsByCategoryId(parseInt(categoryId as string));
+      } else {
+        shops = await storage.getShops();
+      }
       res.json(shops);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch shops" });
@@ -68,7 +113,7 @@ export async function registerRoutes(
     try {
       const parsed = insertShopSchema.safeParse({
         displayOrder: 0,
-        hasLineAccountCoupon: false,
+        slug: nanoid(10),
         ...req.body,
       });
       if (!parsed.success) {
@@ -78,6 +123,19 @@ export async function registerRoutes(
       res.status(201).json(shop);
     } catch (error) {
       res.status(500).json({ message: "Failed to create shop" });
+    }
+  });
+
+  // slugルートは /:id より先に定義する必要がある
+  app.get("/api/shops/slug/:slug", async (req, res) => {
+    try {
+      const shop = await storage.getShopBySlug(req.params.slug);
+      if (!shop) {
+        return res.status(404).json({ message: "Shop not found" });
+      }
+      res.json(shop);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch shop" });
     }
   });
 
@@ -117,6 +175,27 @@ export async function registerRoutes(
     }
   });
 
+  // いいね
+  app.post("/api/shops/:id/like", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid shop ID" });
+      }
+      const shop = await storage.getShopById(id);
+      if (!shop) {
+        return res.status(404).json({ message: "Shop not found" });
+      }
+      const updated = await storage.updateShop(id, { likeCount: shop.likeCount + 1 });
+      res.json({ likeCount: updated?.likeCount });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to like shop" });
+    }
+  });
+
+  // ─────────────────────────────
+  // クーポン
+  // ─────────────────────────────
   app.get("/api/shops/:id/coupons", async (req, res) => {
     try {
       const shopId = parseInt(req.params.id);
@@ -192,503 +271,291 @@ export async function registerRoutes(
     }
   });
 
-  // ===== Per-Shop Booking API Routes =====
-
-  function getBookingStore(req: any, res: any) {
-    const shopId = parseInt(req.params.shopId);
-    if (isNaN(shopId)) {
-      res.status(400).json({ error: "Invalid shop ID" });
-      return null;
-    }
-    const store = bookingManager.getStore(shopId);
-    if (!store) {
-      res.status(404).json({ error: "No booking system for this shop" });
-      return null;
-    }
-    return store;
-  }
-
+  // ─────────────────────────────
+  // スタッフ
+  // ─────────────────────────────
   app.get("/api/shops/:shopId/staff", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const staffWithCourses = store.staff.map((s) => ({
-      ...s,
-      courseIds: store.courses.filter((c) => c.staffIds.includes(s.id)).map((c) => c.id),
-    }));
-    res.json(staffWithCourses);
+    try {
+      const shopId = parseInt(req.params.shopId);
+      if (isNaN(shopId)) {
+        return res.status(400).json({ message: "Invalid shop ID" });
+      }
+      const staff = await storage.getStaffByShopId(shopId);
+      res.json(staff);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch staff" });
+    }
   });
 
   app.post("/api/shops/:shopId/staff", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const body = req.body;
-    if (!body.name || !body.role) {
-      return res.status(400).json({ error: "name and role are required" });
-    }
-    const id = store.genId();
-    const s = {
-      id,
-      name: body.name,
-      role: body.role,
-      avatar: body.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2),
-      courseIds: [] as string[],
-    };
-    store.staff.push(s);
-    res.json({ id });
-  });
-
-  app.put("/api/shops/:shopId/staff", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const body = req.body;
-    const idx = store.staff.findIndex((s) => s.id === body.id);
-    if (idx === -1) return res.json({ ok: true });
-    store.staff[idx] = {
-      ...store.staff[idx],
-      name: body.name ?? store.staff[idx].name,
-      role: body.role ?? store.staff[idx].role,
-      avatar: body.name
-        ? body.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)
-        : store.staff[idx].avatar,
-    };
-    res.json({ ok: true });
-  });
-
-  app.delete("/api/shops/:shopId/staff", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const id = req.query.id as string;
-    store.staff = store.staff.filter((s) => s.id !== id);
-    for (const c of store.courses) {
-      c.staffIds = c.staffIds.filter((sid) => sid !== id);
-    }
-    res.json({ ok: true });
-  });
-
-  app.get("/api/shops/:shopId/courses", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    res.json(store.courses);
-  });
-
-  app.post("/api/shops/:shopId/courses", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const body = req.body;
-    if (!body.name || !body.category || !body.duration || body.price == null) {
-      return res.status(400).json({ error: "name, category, duration, and price are required" });
-    }
-    const id = store.genId();
-    const course = {
-      id,
-      name: body.name,
-      category: body.category,
-      duration: body.duration,
-      price: body.price,
-      description: body.description || "",
-      prepaymentOnly: body.prepaymentOnly ?? false,
-      imageUrl: body.imageUrl || null,
-      staffIds: body.staffIds || [],
-    };
-    store.courses.push(course);
-    if (body.staffIds?.length) {
-      for (const sid of body.staffIds) {
-        const s = store.staff.find((st) => st.id === sid);
-        if (s && !s.courseIds.includes(id)) s.courseIds.push(id);
+    try {
+      const shopId = parseInt(req.params.shopId);
+      if (isNaN(shopId)) {
+        return res.status(400).json({ message: "Invalid shop ID" });
       }
+      const parsed = insertStoreStaffSchema.omit({ shopId: true }).safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
+      }
+      const staff = await storage.createStaff({ ...parsed.data, shopId });
+      res.status(201).json(staff);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create staff" });
     }
-    res.json({ id });
   });
 
-  app.put("/api/shops/:shopId/courses", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const body = req.body;
-    const idx = store.courses.findIndex((c) => c.id === body.id);
-    if (idx === -1) return res.json({ ok: true });
-    store.courses[idx] = {
-      ...store.courses[idx],
-      name: body.name ?? store.courses[idx].name,
-      category: body.category ?? store.courses[idx].category,
-      duration: body.duration ?? store.courses[idx].duration,
-      price: body.price ?? store.courses[idx].price,
-      description: body.description ?? store.courses[idx].description,
-      prepaymentOnly: body.prepaymentOnly ?? store.courses[idx].prepaymentOnly,
-      imageUrl: body.imageUrl ?? store.courses[idx].imageUrl,
-      staffIds: body.staffIds ?? store.courses[idx].staffIds,
-    };
-    res.json({ ok: true });
-  });
-
-  app.delete("/api/shops/:shopId/courses", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const id = req.query.id as string;
-    store.courses = store.courses.filter((c) => c.id !== id);
-    for (const s of store.staff) {
-      s.courseIds = s.courseIds.filter((cid) => cid !== id);
+  app.put("/api/shops/:shopId/staff/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid staff ID" });
+      }
+      const partial = insertStoreStaffSchema.partial().safeParse(req.body);
+      if (!partial.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: partial.error.errors });
+      }
+      const staff = await storage.updateStaff(id, partial.data);
+      if (!staff) {
+        return res.status(404).json({ message: "Staff not found" });
+      }
+      res.json(staff);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update staff" });
     }
-    res.json({ ok: true });
   });
 
-  app.get("/api/shops/:shopId/reservations", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    res.json(
-      store.reservations.map((r) => ({
-        id: r.id,
-        customerName: r.customerName,
-        customerPhone: r.customerPhone,
-        customerEmail: r.customerEmail,
-        date: r.date,
-        time: r.time,
-        staffId: r.staffId,
-        courseId: r.courseId,
-        status: r.status,
-        paid: r.paid,
-      }))
-    );
-  });
-
-  app.post("/api/shops/:shopId/reservations", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const body = req.body;
-    const id = store.genId();
-    const cancelToken = store.genToken();
-    const reservation = {
-      id,
-      customerName: body.customerName,
-      customerPhone: body.customerPhone || undefined,
-      customerEmail: body.customerEmail || undefined,
-      date: body.date,
-      time: body.time,
-      staffId: body.staffId,
-      courseId: body.courseId,
-      status: (body.status || "pending") as "confirmed" | "pending" | "cancelled",
-      paid: body.paid ?? false,
-      cancelToken,
-    };
-    store.reservations.push(reservation);
-    res.json({ id, cancelToken });
-  });
-
-  app.put("/api/shops/:shopId/reservations", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const body = req.body;
-    const idx = store.reservations.findIndex((r) => r.id === body.id);
-    if (idx === -1) return res.json({ ok: true });
-    if (body.status) store.reservations[idx].status = body.status;
-    if (body.paid !== undefined) store.reservations[idx].paid = body.paid;
-    if (body.customerName) store.reservations[idx].customerName = body.customerName;
-    if (body.customerPhone !== undefined) store.reservations[idx].customerPhone = body.customerPhone;
-    if (body.customerEmail !== undefined) store.reservations[idx].customerEmail = body.customerEmail;
-    if (body.date) store.reservations[idx].date = body.date;
-    if (body.time) store.reservations[idx].time = body.time;
-    if (body.staffId) store.reservations[idx].staffId = body.staffId;
-    if (body.courseId) store.reservations[idx].courseId = body.courseId;
-    res.json({ ok: true });
-  });
-
-  app.delete("/api/shops/:shopId/reservations", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const id = req.query.id as string;
-    if (id) {
-      store.reservations = store.reservations.filter((r) => r.id !== id);
+  app.delete("/api/shops/:shopId/staff/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid staff ID" });
+      }
+      const deleted = await storage.deleteStaff(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Staff not found" });
+      }
+      res.json({ message: "Staff deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete staff" });
     }
-    res.json({ ok: true });
   });
 
-  app.get("/api/shops/:shopId/cancel/:token", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const token = req.params.token;
-    const reservation = store.reservations.find((r) => r.cancelToken === token);
-    if (!reservation) return res.status(404).json({ error: "予約が見つかりません" });
-    const course = store.courses.find((c) => c.id === reservation.courseId);
-    res.json({
-      id: reservation.id,
-      customerName: reservation.customerName,
-      date: reservation.date,
-      time: reservation.time,
-      courseId: reservation.courseId,
-      courseName: course?.name || "",
-      courseDuration: course?.duration || 0,
-      coursePrice: course?.price || 0,
-      status: reservation.status,
-    });
+  // ─────────────────────────────
+  // サービス（旧courses）
+  // ─────────────────────────────
+  app.get("/api/shops/:shopId/services", async (req, res) => {
+    try {
+      const shopId = parseInt(req.params.shopId);
+      if (isNaN(shopId)) {
+        return res.status(400).json({ message: "Invalid shop ID" });
+      }
+      const services = await storage.getServicesByShopId(shopId);
+      res.json(services);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch services" });
+    }
   });
 
-  app.post("/api/shops/:shopId/cancel/:token", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const token = req.params.token;
-    const reservation = store.reservations.find((r) => r.cancelToken === token);
-    if (!reservation) return res.status(404).json({ error: "予約が見つかりません" });
-    if (reservation.status === "cancelled") return res.json({ ok: true, already: true });
-    reservation.status = "cancelled";
-    res.json({ ok: true });
+  app.post("/api/shops/:shopId/services", async (req, res) => {
+    try {
+      const shopId = parseInt(req.params.shopId);
+      if (isNaN(shopId)) {
+        return res.status(400).json({ message: "Invalid shop ID" });
+      }
+      const parsed = insertStoreServiceSchema.omit({ shopId: true }).safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
+      }
+      const service = await storage.createService({ ...parsed.data, shopId });
+      res.status(201).json(service);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create service" });
+    }
   });
 
+  app.put("/api/shops/:shopId/services/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid service ID" });
+      }
+      const partial = insertStoreServiceSchema.partial().safeParse(req.body);
+      if (!partial.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: partial.error.errors });
+      }
+      const service = await storage.updateService(id, partial.data);
+      if (!service) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+      res.json(service);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update service" });
+    }
+  });
+
+  app.delete("/api/shops/:shopId/services/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid service ID" });
+      }
+      const deleted = await storage.deleteService(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+      res.json({ message: "Service deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete service" });
+    }
+  });
+
+  // ─────────────────────────────
+  // スロット
+  // ─────────────────────────────
   app.get("/api/shops/:shopId/slots", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const staffId = req.query.staffId as string;
-    const date = req.query.date as string;
-    if (staffId && date) {
-      return res.json(store.getTimeSlots(staffId, date));
+    try {
+      const shopId = parseInt(req.params.shopId);
+      if (isNaN(shopId)) {
+        return res.status(400).json({ message: "Invalid shop ID" });
+      }
+      const { staffId, dayOfWeek } = req.query;
+      let slots;
+      if (staffId && dayOfWeek) {
+        slots = await storage.getSlotsByStaffAndDay(
+          parseInt(staffId as string),
+          parseInt(dayOfWeek as string)
+        );
+      } else if (staffId) {
+        slots = await storage.getSlotsByStaffId(parseInt(staffId as string));
+      } else {
+        slots = await storage.getSlotsByShopId(shopId);
+      }
+      res.json(slots);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch slots" });
     }
-    if (staffId) {
-      return res.json(store.getStaffSlots(staffId));
-    }
-    res.json([]);
-  });
-
-  app.put("/api/shops/:shopId/slots", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const body = req.body;
-    const staffId = body.staffId as string;
-    const dayOfWeek = body.dayOfWeek as number;
-    const time = body.time as string;
-    const available = body.available as boolean;
-    const existing = store.slots.find(
-      (s) => s.staffId === staffId && s.dayOfWeek === dayOfWeek && s.time === time
-    );
-    if (existing) {
-      existing.available = available;
-    } else {
-      store.slots.push({
-        id: store.genId(),
-        staffId,
-        dayOfWeek,
-        time,
-        available,
-      });
-    }
-    res.json({ ok: true });
   });
 
   app.post("/api/shops/:shopId/slots", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const body = req.body;
-    const staffId = body.staffId as string;
-    const dayOfWeek = body.dayOfWeek as number;
-    const times = body.times as string[];
-    const available = body.available as boolean;
-    for (const time of times) {
-      const existing = store.slots.find(
-        (s) => s.staffId === staffId && s.dayOfWeek === dayOfWeek && s.time === time
-      );
-      if (existing) {
-        existing.available = available;
-      } else {
-        store.slots.push({
-          id: store.genId(),
-          staffId,
-          dayOfWeek,
-          time,
-          available,
-        });
-      }
-    }
-    res.json({ ok: true });
-  });
-
-  app.get("/api/shops/:shopId/settings", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    res.json(store.settings);
-  });
-
-  app.put("/api/shops/:shopId/settings", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const body = req.body;
-    for (const [key, value] of Object.entries(body)) {
-      store.settings[key] = value as string;
-    }
-    res.json({ ok: true });
-  });
-
-  app.get("/api/shops/:shopId/inquiries", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    res.json(store.inquiries);
-  });
-
-  app.post("/api/shops/:shopId/inquiries", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const body = req.body;
-    const inquiry = {
-      id: store.genId(),
-      name: body.name,
-      email: body.email || null,
-      phone: body.phone || null,
-      message: body.message,
-      status: "unread",
-      createdAt: new Date().toISOString(),
-    };
-    store.inquiries.push(inquiry);
-    res.json({ id: inquiry.id });
-  });
-
-  app.put("/api/shops/:shopId/inquiries", async (req, res) => {
-    const store = getBookingStore(req, res);
-    if (!store) return;
-    const body = req.body;
-    const inquiry = store.inquiries.find((i) => i.id === body.id);
-    if (inquiry && body.status) {
-      inquiry.status = body.status;
-    }
-    res.json({ ok: true });
-  });
-
-  // Stripe Connect: publishable key
-  app.get("/api/stripe/config", async (_req, res) => {
-    try {
-      const publishableKey = await getStripePublishableKey();
-      res.json({ publishableKey });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  // Stripe Connect: create/get connected account & onboarding link
-  app.post("/api/stripe/connect/onboard/:shopId", async (req, res) => {
     try {
       const shopId = parseInt(req.params.shopId);
-      const shop = await storage.getShopById(shopId);
-      if (!shop) return res.status(404).json({ error: "Shop not found" });
-
-      const stripe = await getUncachableStripeClient();
-      const origin = `${req.protocol}://${req.get("host")}`;
-
-      let accountId = shop.stripeConnectId;
-
-      if (!accountId) {
-        const account = await (stripe as any).accounts.create({
-          type: "express",
-          country: "JP",
-          capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
-          business_profile: { name: shop.name },
-          metadata: { shopId: String(shopId) },
-        });
-        accountId = account.id;
-        await storage.updateShop(shopId, {
-          stripeConnectId: accountId,
-          stripeConnectStatus: "pending",
-        });
+      if (isNaN(shopId)) {
+        return res.status(400).json({ message: "Invalid shop ID" });
       }
-
-      const accountLink = await (stripe as any).accountLinks.create({
-        account: accountId,
-        refresh_url: `${origin}/admin`,
-        return_url: `${origin}/admin?stripe_connect=success&shopId=${shopId}`,
-        type: "account_onboarding",
-      });
-
-      res.json({ url: accountLink.url });
-    } catch (e: any) {
-      console.error("Stripe Connect onboard error:", e);
-      res.status(500).json({ error: e.message });
+      const parsed = insertStoreSlotSchema.omit({ shopId: true }).safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
+      }
+      const slot = await storage.upsertSlot({ ...parsed.data, shopId });
+      res.status(201).json(slot);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upsert slot" });
     }
   });
 
-  // Stripe Connect: get account status
-  app.get("/api/stripe/connect/status/:shopId", async (req, res) => {
+  // ─────────────────────────────
+  // 予約
+  // ─────────────────────────────
+  app.get("/api/shops/:shopId/reservations", async (req, res) => {
     try {
       const shopId = parseInt(req.params.shopId);
-      const shop = await storage.getShopById(shopId);
-      if (!shop) return res.status(404).json({ error: "Shop not found" });
-
-      if (!shop.stripeConnectId) {
-        return res.json({ status: "none", connected: false });
+      if (isNaN(shopId)) {
+        return res.status(400).json({ message: "Invalid shop ID" });
       }
-
-      const stripe = await getUncachableStripeClient();
-      const account = await (stripe as any).accounts.retrieve(shop.stripeConnectId);
-      const connected = account.details_submitted && account.charges_enabled;
-      const status = connected ? "active" : "pending";
-
-      if (shop.stripeConnectStatus !== status) {
-        await storage.updateShop(shopId, { stripeConnectStatus: status });
-      }
-
-      res.json({
-        status,
-        connected,
-        accountId: shop.stripeConnectId,
-        chargesEnabled: account.charges_enabled,
-        detailsSubmitted: account.details_submitted,
-      });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      const reservations = await storage.getReservationsByShopId(shopId);
+      res.json(reservations);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch reservations" });
     }
   });
 
-  // Stripe Connect: create express dashboard login link
-  app.post("/api/stripe/connect/dashboard/:shopId", async (req, res) => {
+  app.post("/api/shops/:shopId/reservations", async (req, res) => {
     try {
       const shopId = parseInt(req.params.shopId);
-      const shop = await storage.getShopById(shopId);
-      if (!shop?.stripeConnectId) return res.status(404).json({ error: "Not connected" });
-
-      const stripe = await getUncachableStripeClient();
-      const loginLink = await (stripe as any).accounts.createLoginLink(shop.stripeConnectId);
-      res.json({ url: loginLink.url });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  // Stripe Connect: create payment intent for reservation
-  app.post("/api/stripe/connect/payment-intent", async (req, res) => {
-    try {
-      const { shopId, amount, currency = "jpy", description } = req.body;
-      const shop = await storage.getShopById(parseInt(shopId));
-      if (!shop?.stripeConnectId) {
-        return res.status(400).json({ error: "Shop not connected to Stripe" });
+      if (isNaN(shopId)) {
+        return res.status(400).json({ message: "Invalid shop ID" });
       }
-
-      const stripe = await getUncachableStripeClient();
-      const platformFee = Math.floor(amount * 0.05);
-
-      const paymentIntent = await (stripe as any).paymentIntents.create({
-        amount,
-        currency,
-        description,
-        application_fee_amount: platformFee,
-        transfer_data: { destination: shop.stripeConnectId },
+      const parsed = insertReservationSchema.omit({ shopId: true, cancelToken: true }).safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
+      }
+      const reservation = await storage.createReservation({
+        ...parsed.data,
+        shopId,
+        cancelToken: nanoid(32),
       });
-
-      res.json({ clientSecret: paymentIntent.client_secret });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(201).json(reservation);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create reservation" });
     }
   });
 
-  // Stripe webhook
-  app.post(
-    "/api/stripe/webhook",
-    express.raw({ type: "application/json" }),
-    async (req, res) => {
-      const signature = req.headers["stripe-signature"];
-      if (!signature) return res.status(400).json({ error: "Missing signature" });
-      try {
-        const sig = Array.isArray(signature) ? signature[0] : signature;
-        await WebhookHandlers.processWebhook(req.body as Buffer, sig);
-        res.status(200).json({ received: true });
-      } catch (e: any) {
-        console.error("Webhook error:", e.message);
-        res.status(400).json({ error: "Webhook error" });
+  app.put("/api/shops/:shopId/reservations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid reservation ID" });
       }
+      const partial = insertReservationSchema.partial().safeParse(req.body);
+      if (!partial.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: partial.error.errors });
+      }
+      const reservation = await storage.updateReservation(id, partial.data);
+      if (!reservation) {
+        return res.status(404).json({ message: "Reservation not found" });
+      }
+      res.json(reservation);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update reservation" });
     }
-  );
+  });
+
+  app.delete("/api/shops/:shopId/reservations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Failed to delete reservation" });
+      }
+      const deleted = await storage.deleteReservation(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Reservation not found" });
+      }
+      res.json({ message: "Reservation deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete reservation" });
+    }
+  });
+
+  // ─────────────────────────────
+  // キャンセル
+  // ─────────────────────────────
+  app.get("/api/cancel/:token", async (req, res) => {
+    try {
+      const reservation = await storage.getReservationByCancelToken(req.params.token);
+      if (!reservation) {
+        return res.status(404).json({ message: "予約が見つかりません" });
+      }
+      res.json(reservation);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch reservation" });
+    }
+  });
+
+  app.post("/api/cancel/:token", async (req, res) => {
+    try {
+      const reservation = await storage.getReservationByCancelToken(req.params.token);
+      if (!reservation) {
+        return res.status(404).json({ message: "予約が見つかりません" });
+      }
+      if (reservation.status === "CANCELLED") {
+        return res.json({ ok: true, already: true });
+      }
+      await storage.updateReservation(reservation.id, { status: "CANCELLED" });
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to cancel reservation" });
+    }
+  });
 
   return httpServer;
 }
