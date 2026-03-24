@@ -59,7 +59,7 @@ export interface IStorage {
   // 予約
   getReservationsByShopId(shopId: number): Promise<Reservation[]>;
   getReservationById(id: number): Promise<Reservation | undefined>;
-  getReservationByCancelToken(token: string): Promise<Reservation | undefined>;
+  getReservationByReservationToken(token: string): Promise<Reservation | undefined>;
   createReservation(reservation: InsertReservation): Promise<Reservation>;
   updateReservation(id: number, data: Partial<InsertReservation>): Promise<Reservation | undefined>;
   deleteReservation(id: number): Promise<boolean>;
@@ -264,9 +264,9 @@ export class DatabaseStorage implements IStorage {
     return reservation;
   }
 
-  async getReservationByCancelToken(token: string): Promise<Reservation | undefined> {
+  async getReservationByReservationToken(token: string): Promise<Reservation | undefined> {
     const [reservation] = await db.select().from(reservations)
-      .where(eq(reservations.cancelToken, token));
+      .where(eq(reservations.reservationToken, token));
     return reservation;
   }
 

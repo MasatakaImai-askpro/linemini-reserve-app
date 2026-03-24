@@ -136,7 +136,7 @@ export const reservations = pgTable("reservations", {
   customerEmail: text("customer_email"),
   scheduledAt:   timestamp("scheduled_at").notNull(),
   status:        reservationStatusEnum("status").notNull().default("PENDING"),
-  cancelToken:   text("cancel_token").notNull().unique(),
+  reservationToken:   text("reservation_token").notNull().unique(),
   createdAt:     timestamp("created_at").notNull().defaultNow(),
   updatedAt:     timestamp("updated_at").notNull().defaultNow(),
 });
