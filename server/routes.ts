@@ -475,14 +475,14 @@ export async function registerRoutes(
       if (isNaN(shopId)) {
         return res.status(400).json({ message: "Invalid shop ID" });
       }
-      const parsed = insertReservationSchema.omit({ shopId: true, cancelToken: true }).safeParse(req.body);
+      const parsed = insertReservationSchema.omit({ shopId: true, reservationToken: true }).safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
       }
       const reservation = await storage.createReservation({
         ...parsed.data,
         shopId,
-        cancelToken: nanoid(32),
+        reservationToken: nanoid(32),
       });
       res.status(201).json(reservation);
     } catch (error) {
@@ -531,7 +531,7 @@ export async function registerRoutes(
   // ─────────────────────────────
   app.get("/api/cancel/:token", async (req, res) => {
     try {
-      const reservation = await storage.getReservationByCancelToken(req.params.token);
+      const reservation = await storage.getReservationByReservationToken(req.params.token);
       if (!reservation) {
         return res.status(404).json({ message: "予約が見つかりません" });
       }
@@ -543,7 +543,7 @@ export async function registerRoutes(
 
   app.post("/api/cancel/:token", async (req, res) => {
     try {
-      const reservation = await storage.getReservationByCancelToken(req.params.token);
+      const reservation = await storage.getReservationByReservationToken(req.params.token);
       if (!reservation) {
         return res.status(404).json({ message: "予約が見つかりません" });
       }

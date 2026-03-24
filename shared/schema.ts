@@ -104,6 +104,8 @@ export const storeServices = pgTable("store_services", {
   description:        text("description"),
   duration:           integer("duration"),
   price:              integer("price"),
+  imageUrl:           text("image_url"),
+  staffIds:           integer("staff_ids").array(),
   requiresPrepayment: boolean("requires_prepayment").notNull().default(false),
   isActive:           boolean("is_active").notNull().default(true),
   updatedAt:          timestamp("updated_at").notNull().defaultNow(),
@@ -136,7 +138,7 @@ export const reservations = pgTable("reservations", {
   customerEmail: text("customer_email"),
   scheduledAt:   timestamp("scheduled_at").notNull(),
   status:        reservationStatusEnum("status").notNull().default("PENDING"),
-  cancelToken:   text("cancel_token").notNull().unique(),
+  reservationToken:   text("reservation_token").notNull().unique(),
   createdAt:     timestamp("created_at").notNull().defaultNow(),
   updatedAt:     timestamp("updated_at").notNull().defaultNow(),
 });

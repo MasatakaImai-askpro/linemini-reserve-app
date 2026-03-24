@@ -11,14 +11,14 @@ interface BookingCompleteProps {
   date: string;
   time: string;
   reservationId: string | null;
-  cancelToken: string | null;
+  reservationToken: string | null;
   onClose: () => void;
 }
 
-export function BookingComplete({ shopId, course, staff, date, time, cancelToken, onClose }: BookingCompleteProps) {
+export function BookingComplete({ shopId, course, staff, date, time, reservationToken, onClose }: BookingCompleteProps) {
   const parsedDate = parseISO(date);
-  const cancelUrl = cancelToken
-    ? `${window.location.origin}/app/cancel/${shopId}/${cancelToken}`
+  const cancelUrl = reservationToken
+    ? `${window.location.origin}/app/cancel/${shopId}/${reservationToken}`
     : null;
 
   return (
