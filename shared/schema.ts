@@ -104,6 +104,8 @@ export const storeServices = pgTable("store_services", {
   description:        text("description"),
   duration:           integer("duration"),
   price:              integer("price"),
+  imageUrl:           text("image_url"),
+  staffIds:           integer("staff_id").array(),
   requiresPrepayment: boolean("requires_prepayment").notNull().default(false),
   isActive:           boolean("is_active").notNull().default(true),
   updatedAt:          timestamp("updated_at").notNull().defaultNow(),
