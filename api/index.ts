@@ -11,6 +11,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-key-change-in-production";
 
@@ -392,11 +393,12 @@ app.post("/api/auth/login", async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-    // プレーンテキスト比較（ハッシュかプレーンテキストどちらでも対応）
-    const plainMatch = user.passwordHash === password;
-    const hashMatch = hashPassword(password) === user.passwordHash;
-    console.log("[v0] Password comparison:", { plainMatch, hashMatch, inputPassword: password, storedHash: user.passwordHash, inputHashed: hashPassword(password) });
-    const valid = plainMatch || hashMatch;
+    // パスワード照合: bcrypt / SHA256 / プレーンテキストの順に試みる
+      const plainMatch = user.passwordHash === password;
+      const sha256Match = hashPassword(password) === user.passwordHash;
+      const bcryptMatch = user.passwordHash.startsWith("$2") ? await bcrypt.compare(password, user.passwordHash) : false;
+      console.log("[v1] Password comparison:", { plainMatch, sha256Match, bcryptMatch });
+      const valid = plainMatch || sha256Match || bcryptMatch;
     if (!valid) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
