@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, Clock, User, UserCircle, CreditCard, Loader2 } from "lucide-react";
+import { Calendar, Clock, User, UserCircle, CreditCard, Loader2, Mail, Phone } from "lucide-react";
 import { formatPrice, formatDuration, type Course, type Staff } from "@/lib/booking-api";
 import { format, parseISO } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -28,6 +28,8 @@ function CardPaymentForm({
   shopId,
   course,
   customerName,
+  customerEmail,
+  customerPhone,
   onPaid,
   onBack,
   children,
@@ -35,6 +37,8 @@ function CardPaymentForm({
   shopId: string;
   course: Course;
   customerName: string;
+  customerEmail: string;
+  customerPhone: string;
   onPaid: () => void;
   onBack: () => void;
   children: React.ReactNode;
@@ -55,7 +59,8 @@ function CardPaymentForm({
         shopId,
         amount: course.price,
         currency: "jpy",
-        description: course.name,
+        courseName: course.name,
+        courseId: course.id,
       }),
     })
       .then((r) => r.json())
@@ -64,7 +69,7 @@ function CardPaymentForm({
         else setPiError(data.error || "決済の準備に失敗しました");
       })
       .catch(() => setPiError("決済の準備に失敗しました"));
-  }, [shopId, course.price, course.name]);
+  }, [shopId, course.price, course.name, course.id]);
 
   const handlePay = async () => {
     if (!stripe || !elements || !clientSecret) return;
@@ -76,7 +81,11 @@ function CardPaymentForm({
     const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
       payment_method: {
         card: cardEl,
-        billing_details: { name: customerName },
+        billing_details: {
+          name: customerName,
+          email: customerEmail || undefined,
+          phone: customerPhone || undefined,
+        },
       },
     });
 
@@ -174,9 +183,11 @@ export function PaymentConfirm({
 }: PaymentConfirmProps) {
   const parsedDate = parseISO(date);
   const [customerName, setCustomerName] = useState("");
-  const [errors, setErrors] = useState<{ name?: string }>({});
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string }>({});
   const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
-  const [nameSubmitted, setNameSubmitted] = useState(false);
+  const [formSubmitted, setFormSubmitted] = useState(false);
 
   const needsPayment = course.prepaymentOnly && course.price > 0;
 
@@ -189,16 +200,23 @@ export function PaymentConfirm({
   const validate = () => {
     const e: typeof errors = {};
     if (!customerName.trim()) e.name = "お名前を入力してください";
+    if (!customerEmail.trim()) e.email = "メールアドレスを入力してください";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) e.email = "正しいメールアドレスを入力してください";
+    if (!customerPhone.trim()) e.phone = "電話番号を入力してください";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const handleNameNext = () => {
+  const handleNext = () => {
     if (!validate()) return;
     if (!needsPayment) {
-      onConfirm({ customerName: customerName.trim(), customerEmail: "", customerPhone: "" });
+      onConfirm({
+        customerName: customerName.trim(),
+        customerEmail: customerEmail.trim(),
+        customerPhone: customerPhone.trim(),
+      });
     } else {
-      setNameSubmitted(true);
+      setFormSubmitted(true);
     }
   };
 
@@ -236,13 +254,13 @@ export function PaymentConfirm({
       </div>
       <div className="px-4 py-3">
         <div className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-          {needsPayment ? "カードにて事前決済が必要です" : "お支払いは当日店舗にてお願いいたします"}
+          {needsPayment ? "カードにて事前決済が必要です。決済は直接店舗アカウントへ送金されます" : "お支払いは当日店舗にてお願いいたします"}
         </div>
       </div>
     </div>
   );
 
-  if (needsPayment && nameSubmitted) {
+  if (needsPayment && formSubmitted) {
     if (!stripePromise) {
       return (
         <div className="flex items-center justify-center py-10 text-muted-foreground">
@@ -262,8 +280,14 @@ export function PaymentConfirm({
             shopId={shopId}
             course={course}
             customerName={customerName}
-            onPaid={() => onConfirm({ customerName: customerName.trim(), customerEmail: "", customerPhone: "" })}
-            onBack={() => setNameSubmitted(false)}
+            customerEmail={customerEmail}
+            customerPhone={customerPhone}
+            onPaid={() => onConfirm({
+              customerName: customerName.trim(),
+              customerEmail: customerEmail.trim(),
+              customerPhone: customerPhone.trim(),
+            })}
+            onBack={() => setFormSubmitted(false)}
           >
             <div />
           </CardPaymentForm>
@@ -299,11 +323,43 @@ export function PaymentConfirm({
           />
           {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
         </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="customerEmail" className="flex items-center gap-1.5 text-xs font-medium">
+            <Mail className="h-3.5 w-3.5" />
+            メールアドレス <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="customerEmail"
+            type="email"
+            value={customerEmail}
+            onChange={(e) => setCustomerEmail(e.target.value)}
+            placeholder="example@email.com"
+            data-testid="input-customer-email"
+          />
+          {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="customerPhone" className="flex items-center gap-1.5 text-xs font-medium">
+            <Phone className="h-3.5 w-3.5" />
+            電話番号 <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="customerPhone"
+            type="tel"
+            value={customerPhone}
+            onChange={(e) => setCustomerPhone(e.target.value)}
+            placeholder="090-1234-5678"
+            data-testid="input-customer-phone"
+          />
+          {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
+        </div>
       </div>
 
       <div className="flex flex-col gap-2 border-t border-border bg-card px-4 py-4">
         <Button
-          onClick={handleNameNext}
+          onClick={handleNext}
           className="w-full bg-primary py-6 text-sm font-bold text-primary-foreground hover:bg-primary/90"
           data-testid="button-confirm-reservation"
         >

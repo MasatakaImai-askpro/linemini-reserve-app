@@ -950,20 +950,44 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
       }
 
       const stripe = await getStripeClient();
-      // テストモード: direct chargeでPaymentIntentを作成（Connect経由の場合はcapabilityが有効になってから）
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount),
-        currency: 'jpy',
-        payment_method_types: ['card'],
-        description: courseName || 'コース予約',
-        metadata: {
-          shop_id: String(shopId),
-          shop_name: shop.name,
-          course_id: courseId || '',
-          course_name: courseName || '',
-          stripe_connect_id: shop.stripe_connect_id,
-        },
-      });
+      // Stripe Connect: transfer_data.destinationで店舗アカウントへ送金
+      // 店舗がStripe Connectオンボーディング完了後、決済は自動的に店舗口座へ送金される
+      let paymentIntent;
+      try {
+        paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(amount),
+          currency: 'jpy',
+          payment_method_types: ['card'],
+          description: courseName || 'コース予約',
+          on_behalf_of: shop.stripe_connect_id,
+          transfer_data: { destination: shop.stripe_connect_id },
+          metadata: {
+            shop_id: String(shopId),
+            shop_name: shop.name,
+            course_id: courseId || '',
+            course_name: courseName || '',
+            stripe_connect_id: shop.stripe_connect_id,
+          },
+        });
+      } catch (connectErr) {
+        // テストモード等でcapability未有効の場合はフォールバック
+        if (connectErr.code === 'account_invalid' || connectErr.message?.includes('capability') || connectErr.message?.includes('does not have')) {
+          paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(amount),
+            currency: 'jpy',
+            payment_method_types: ['card'],
+            description: courseName || 'コース予約',
+            metadata: {
+              shop_id: String(shopId),
+              shop_name: shop.name,
+              course_id: courseId || '',
+              course_name: courseName || '',
+              stripe_connect_id: shop.stripe_connect_id,
+              note: 'pending_onboarding',
+            },
+          });
+        } else { throw connectErr; }
+      }
 
       res.json({ clientSecret: paymentIntent.client_secret });
     } catch (e: any) {
