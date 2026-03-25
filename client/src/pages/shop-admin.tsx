@@ -535,18 +535,6 @@ export default function ShopAdminPage() {
     );
   }
 
-  if (!shop.reservationUrl) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="p-8 text-center overflow-visible">
-          <h2 className="font-bold text-lg mb-2">予約機能が無効です</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            この店舗の予約機能は有効になっていません。予約機能を有効にするには管理者にお問い合わせください。
-          </p>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background">
