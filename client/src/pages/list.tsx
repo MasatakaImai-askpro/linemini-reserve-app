@@ -31,8 +31,10 @@ import { useFavorites } from "@/hooks/use-favorites";
 export default function ListPage() {
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
-  const initialArea = params.get("area") || "all";
-  const initialCategory = params.get("category") || "all";
+  const rawArea = params.get("area");
+  const rawCategory = params.get("category");
+  const initialArea = (rawArea && rawArea !== "undefined" && rawArea !== "null") ? rawArea : "all";
+  const initialCategory = (rawCategory && rawCategory !== "undefined" && rawCategory !== "null") ? rawCategory : "all";
   const initialQ = params.get("q") || "";
 
   const [area, setArea] = useState(initialArea);
