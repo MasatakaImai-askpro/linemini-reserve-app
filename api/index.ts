@@ -383,15 +383,20 @@ app.delete("/api/coupons/:id", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { username, password } = req.body;
+    console.log("[v0] Login attempt:", { username, password });
     if (!username || !password) {
       return res.status(400).json({ message: "Username and password required" });
     }
     const [user] = await db.select().from(users).where(eq(users.username, username));
+    console.log("[v0] User found:", user ? { id: user.id, username: user.username, passwordHash: user.passwordHash } : "null");
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
     // プレーンテキスト比較（ハッシュかプレーンテキストどちらでも対応）
-    const valid = user.passwordHash === password || user.passwordHash === hashPassword(password);
+    const plainMatch = user.passwordHash === password;
+    const hashMatch = hashPassword(password) === user.passwordHash;
+    console.log("[v0] Password comparison:", { plainMatch, hashMatch, inputPassword: password, storedHash: user.passwordHash, inputHashed: hashPassword(password) });
+    const valid = plainMatch || hashMatch;
     if (!valid) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
