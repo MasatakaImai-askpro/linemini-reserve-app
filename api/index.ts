@@ -116,6 +116,7 @@ const db = drizzle(sql, {
 // ─────────────────────────────
 // Express設定
 // ─────────────────────────────
+const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
