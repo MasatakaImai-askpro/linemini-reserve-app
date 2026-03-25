@@ -1,5 +1,5 @@
 import {
-  pgTable, pgEnum, text, integer,
+  pgTable, pgEnum, text, integer, serial,
   boolean, timestamp, uniqueIndex
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
@@ -24,7 +24,7 @@ export const orderStatusEnum = pgEnum("order_status", [
 // エリアマスタ
 // ─────────────────────────────
 export const areas = pgTable("areas", {
-  id:        integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id:        serial("id").primaryKey(),
   slug:      text("slug").notNull().unique(),
   name:      text("name").notNull(),
   label:     text("label").notNull(),
@@ -35,7 +35,7 @@ export const areas = pgTable("areas", {
 // カテゴリーマスタ
 // ─────────────────────────────
 export const categories = pgTable("categories", {
-  id:        integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id:        serial("id").primaryKey(),
   slug:      text("slug").notNull().unique(),
   name:      text("name").notNull(),
   icon:      text("icon").notNull(),
@@ -64,6 +64,9 @@ export const shops = pgTable("shops", {
   name:                  text("name").notNull(),
   description:           text("description").notNull(),
   areaId:                integer("area_id").notNull(),
+  area:                  text("area").notNull().default(""),
+  category:              text("category").notNull().default(""),
+  subcategory:           text("subcategory"),
   address:               text("address").notNull(),
   phone:                 text("phone"),
   hours:                 text("hours"),
@@ -75,6 +78,8 @@ export const shops = pgTable("shops", {
   galleryImageUrls:      text("gallery_image_urls").array(),
   isActive:              boolean("is_active").notNull().default(true),
   enableStaffAssignment: boolean("enable_staff_assignment").notNull().default(false),
+  reservationUrl:        text("reservation_url"),
+  reservationImageUrl:   text("reservation_image_url"),
   likeCount:             integer("like_count").notNull().default(0),
   stripeConnectId:       text("stripe_connect_id"),
   stripeConnectStatus:   text("stripe_connect_status").default("none"),
@@ -86,7 +91,7 @@ export const shops = pgTable("shops", {
 // 店舗オーナー（管理画面ユーザー）
 // ─────────────────────────────
 export const storeOwners = pgTable("store_owners", {
-  id:        integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id:        serial("id").primaryKey(),
   email:     text("email").notNull().unique(),
   password:  text("password").notNull(),
   shopId:    integer("shop_id").notNull().unique(),
@@ -114,7 +119,7 @@ export const storeServices = pgTable("store_services", {
 // スタッフ
 // ─────────────────────────────
 export const storeStaff = pgTable("store_staff", {
-  id:        integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id:        serial("id").primaryKey(),
   shopId:    integer("shop_id").notNull(),
   name:      text("name").notNull(),
   role:      text("role"),
@@ -145,18 +150,21 @@ export const reservations = pgTable("reservations", {
 // クーポン
 // ─────────────────────────────
 export const coupons = pgTable("coupons", {
-  id:              integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  shopId:          integer("shop_id").notNull(),
-  title:           text("title").notNull(),
-  description:     text("description"),
-  discountType:    discountTypeEnum("discount_type").notNull(),
-  discountValue:   integer("discount_value").notNull(),
-  validFrom:       timestamp("valid_from"),
-  validUntil:      timestamp("valid_until"),
-  isFirstTimeOnly: boolean("is_first_time_only").notNull().default(false),
-  isActive:        boolean("is_active").notNull().default(true),
-  createdAt:       timestamp("created_at").notNull().defaultNow(),
-  updatedAt:       timestamp("updated_at").notNull().defaultNow(),
+  id:                   integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId:               integer("shop_id").notNull(),
+  title:                text("title").notNull(),
+  description:          text("description"),
+  discount:             text("discount"),
+  discountType:         discountTypeEnum("discount_type").notNull().default("FREE"),
+  discountValue:        integer("discount_value").notNull().default(0),
+  validFrom:            timestamp("valid_from"),
+  validUntil:           timestamp("valid_until"),
+  expiryDate:           text("expiry_date"),
+  isFirstTimeOnly:      boolean("is_first_time_only").notNull().default(false),
+  isLineAccountCoupon:  boolean("is_line_account_coupon").notNull().default(false),
+  isActive:             boolean("is_active").notNull().default(true),
+  createdAt:            timestamp("created_at").notNull().defaultNow(),
+  updatedAt:            timestamp("updated_at").notNull().defaultNow(),
 });
 
 // ─────────────────────────────
@@ -261,12 +269,12 @@ export type StoreSlot          = typeof storeSlots.$inferSelect;
 // 定数（seed投入用・DB移行後は削除可）
 // ─────────────────────────────
 export const CATEGORIES = [
-  { slug: "gourmet",  name: "グルメ",        icon: "utensils" },
-  { slug: "beauty",   name: "美容・健康",     icon: "sparkles" },
-  { slug: "shopping", name: "ショッピング",   icon: "shopping-bag" },
-  { slug: "leisure",  name: "レジャー・体験", icon: "map-pin" },
-  { slug: "service",  name: "サービス",       icon: "wrench" },
-  { slug: "medical",  name: "医療・福祉",     icon: "heart-pulse" },
+  { id: "gourmet",  slug: "gourmet",  name: "グルメ",        icon: "utensils" },
+  { id: "beauty",   slug: "beauty",   name: "美容・健康",     icon: "sparkles" },
+  { id: "shopping", slug: "shopping", name: "ショッピング",   icon: "shopping-bag" },
+  { id: "leisure",  slug: "leisure",  name: "レジャー・体験", icon: "map-pin" },
+  { id: "service",  slug: "service",  name: "サービス",       icon: "wrench" },
+  { id: "medical",  slug: "medical",  name: "医療・福祉",     icon: "heart-pulse" },
 ] as const;
 export const SUBCATEGORIES: Record<string, { id: string; name: string }[]> = {
   gourmet: [
@@ -321,18 +329,18 @@ export const SUBCATEGORIES: Record<string, { id: string; name: string }[]> = {
   ],
 };
 export const AREAS = [
-  { slug: "odawara",        name: "小田原", label: "小田原エリア" },
-  { slug: "yamato",         name: "大和",   label: "大和エリア" },
-  { slug: "hadano",         name: "秦野",   label: "秦野エリア" },
-  { slug: "hiratsuka",      name: "平塚",   label: "平塚エリア" },
-  { slug: "atsugi",         name: "厚木",   label: "厚木エリア" },
-  { slug: "isehara",        name: "伊勢原", label: "伊勢原エリア" },
-  { slug: "ebina",          name: "海老名", label: "海老名エリア" },
-  { slug: "zama",           name: "座間",   label: "座間エリア" },
-  { slug: "ayase",          name: "綾瀬",   label: "綾瀬エリア" },
-  { slug: "chigasaki",      name: "茅ヶ崎", label: "茅ヶ崎エリア" },
-  { slug: "ninomiya",       name: "二宮",   label: "二宮エリア" },
-  { slug: "oiso",           name: "大磯",   label: "大磯エリア" },
-  { slug: "minamiashigara", name: "南足柄", label: "南足柄エリア" },
-  { slug: "kaisei",         name: "開成",   label: "開成エリア" },
+  { id: "odawara",        slug: "odawara",        name: "小田原", label: "小田原エリア" },
+  { id: "yamato",         slug: "yamato",         name: "大和",   label: "大和エリア" },
+  { id: "hadano",         slug: "hadano",         name: "秦野",   label: "秦野エリア" },
+  { id: "hiratsuka",      slug: "hiratsuka",      name: "平塚",   label: "平塚エリア" },
+  { id: "atsugi",         slug: "atsugi",         name: "厚木",   label: "厚木エリア" },
+  { id: "isehara",        slug: "isehara",        name: "伊勢原", label: "伊勢原エリア" },
+  { id: "ebina",          slug: "ebina",          name: "海老名", label: "海老名エリア" },
+  { id: "zama",           slug: "zama",           name: "座間",   label: "座間エリア" },
+  { id: "ayase",          slug: "ayase",          name: "綾瀬",   label: "綾瀬エリア" },
+  { id: "chigasaki",      slug: "chigasaki",      name: "茅ヶ崎", label: "茅ヶ崎エリア" },
+  { id: "ninomiya",       slug: "ninomiya",       name: "二宮",   label: "二宮エリア" },
+  { id: "oiso",           slug: "oiso",           name: "大磯",   label: "大磯エリア" },
+  { id: "minamiashigara", slug: "minamiashigara", name: "南足柄", label: "南足柄エリア" },
+  { id: "kaisei",         slug: "kaisei",         name: "開成",   label: "開成エリア" },
 ] as const;
