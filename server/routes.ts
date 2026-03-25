@@ -452,7 +452,7 @@ export async function registerRoutes(
     const token = store.genToken();
     const newReservation = {
       id: `r${shopId}-${store.genId()}`,
-      cancelToken: token,
+      reservationToken: token,
       status: "confirmed" as const,
       paid: false,
       ...req.body,
@@ -486,7 +486,7 @@ export async function registerRoutes(
     const shopId = parseInt(req.params.shopId);
     const store = bookingManager.getStore(shopId);
     if (!store) return res.status(404).json({ message: "予約が見つかりません" });
-    const r = store.reservations.find((r) => r.cancelToken === req.params.token);
+    const r = store.reservations.find((r) => r.reservationToken === req.params.token);
     if (!r) return res.status(404).json({ message: "予約が見つかりません" });
     const course = store.courses.find((c) => c.id === r.courseId);
     res.json({
@@ -506,7 +506,7 @@ export async function registerRoutes(
     const shopId = parseInt(req.params.shopId);
     const store = bookingManager.getStore(shopId);
     if (!store) return res.status(404).json({ message: "予約が見つかりません" });
-    const r = store.reservations.find((r) => r.cancelToken === req.params.token);
+    const r = store.reservations.find((r) => r.reservationToken === req.params.token);
     if (!r) return res.status(404).json({ message: "予約が見つかりません" });
     if (r.status === "cancelled") return res.json({ ok: true, already: true });
     r.status = "cancelled";
