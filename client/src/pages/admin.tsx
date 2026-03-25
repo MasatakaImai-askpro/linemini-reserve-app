@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useLogout } from "@/hooks/use-auth";
+import { LogOut } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +24,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  ArrowLeft,
   Settings,
   Ticket,
   Plus,
@@ -36,12 +37,8 @@ import {
   Copy,
   Check,
   Search,
-  CreditCard,
-  CircleCheck,
-  CircleDashed,
-  CircleAlert,
 } from "lucide-react";
-import { SiLine, SiStripe } from "react-icons/si";
+import { SiLine } from "react-icons/si";
 import { AREAS, CATEGORIES, SUBCATEGORIES } from "@shared/schema";
 import type { Shop, Coupon } from "@shared/schema";
 import { getAreaName, getCategoryName } from "@/lib/data";
@@ -154,46 +151,6 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
     },
   });
 
-  const { data: stripeStatus, refetch: refetchStripeStatus } = useQuery({
-    queryKey: ["/api/stripe/connect/status", shop.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/stripe/connect/status/${shop.id}`);
-      return res.json();
-    },
-    staleTime: 30000,
-  });
-
-  const onboardMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/stripe/connect/onboard/${shop.id}`, {});
-      const data = await res.json();
-      return data;
-    },
-    onSuccess: (data) => {
-      if (data.url) {
-        window.open(data.url, "_blank");
-        setTimeout(() => refetchStripeStatus(), 3000);
-      }
-    },
-    onError: () => {
-      toast({ title: "Stripe接続の開始に失敗しました", variant: "destructive" });
-    },
-  });
-
-  const dashboardMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/stripe/connect/dashboard/${shop.id}`, {});
-      const data = await res.json();
-      return data;
-    },
-    onSuccess: (data) => {
-      if (data.url) window.open(data.url, "_blank");
-    },
-    onError: () => {
-      toast({ title: "ダッシュボードのリンク取得に失敗しました", variant: "destructive" });
-    },
-  });
-
   return (
     <Card className="overflow-visible p-5 space-y-5">
       <div className="flex items-center justify-between">
@@ -271,81 +228,12 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
           {updateShopMutation.isPending ? "保存中..." : "店舗設定を保存"}
         </Button>
 
-        {reservationEnabled && (
-          <Link href={`/admin/shop/${shop.id}`}>
-            <Button variant="outline" size="sm" className="gap-1.5" data-testid={`button-shop-manage-${shop.id}`}>
-              <ExternalLink className="w-3.5 h-3.5" />
-              店舗管理画面を開く
-            </Button>
-          </Link>
-        )}
-      </div>
-
-      <div className="border-t pt-4">
-        <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
-          <SiStripe className="w-4 h-4 text-[#635BFF]" />
-          Stripe Connect 決済連携
-        </h4>
-        <div className="rounded-md border p-3 space-y-3">
-          <div className="flex items-center gap-2">
-            {stripeStatus?.connected ? (
-              <CircleCheck className="w-4 h-4 text-green-600" />
-            ) : stripeStatus?.status === "pending" ? (
-              <CircleAlert className="w-4 h-4 text-amber-500" />
-            ) : (
-              <CircleDashed className="w-4 h-4 text-muted-foreground" />
-            )}
-            <span className="text-sm font-medium">
-              {stripeStatus?.connected
-                ? "接続済み（決済受取可能）"
-                : stripeStatus?.status === "pending"
-                ? "設定中（オンボーディング未完了）"
-                : "未接続"}
-            </span>
-            {stripeStatus?.accountId && (
-              <span className="text-xs text-muted-foreground ml-auto">{stripeStatus.accountId}</span>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            {!stripeStatus?.connected && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 border-[#635BFF] text-[#635BFF] hover:bg-[#635BFF]/5"
-                onClick={() => onboardMutation.mutate()}
-                disabled={onboardMutation.isPending}
-                data-testid={`button-stripe-onboard-${shop.id}`}
-              >
-                <CreditCard className="w-3.5 h-3.5" />
-                {onboardMutation.isPending ? "処理中..." :
-                  stripeStatus?.status === "pending" ? "設定を再開" : "Stripe連携を開始"}
-              </Button>
-            )}
-            {stripeStatus?.connected && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                onClick={() => dashboardMutation.mutate()}
-                disabled={dashboardMutation.isPending}
-                data-testid={`button-stripe-dashboard-${shop.id}`}
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                {dashboardMutation.isPending ? "取得中..." : "Stripeダッシュボードを開く"}
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-xs text-muted-foreground"
-              onClick={() => refetchStripeStatus()}
-              data-testid={`button-stripe-refresh-${shop.id}`}
-            >
-              状態を更新
-            </Button>
-          </div>
-        </div>
+        <Link href={`/admin/shop/${shop.id}`}>
+          <Button variant="outline" size="sm" className="gap-1.5" data-testid={`button-shop-manage-${shop.id}`}>
+            <ExternalLink className="w-3.5 h-3.5" />
+            店舗管理画面を開く
+          </Button>
+        </Link>
       </div>
 
       <div className="border-t pt-4">
@@ -732,19 +620,27 @@ function ShopManagementTab() {
 }
 
 export default function AdminPage() {
+  const logout = useLogout();
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b">
         <div className="flex items-center gap-2 px-4 md:px-8 h-14">
-          <Link href="/" data-testid="button-admin-back" onClick={(e) => { e.preventDefault(); window.location.href = "/"; }}>
-            <Button size="icon" variant="ghost">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1">
             <Settings className="w-4 h-4 text-primary" />
             <span className="font-bold text-sm" data-testid="text-admin-title">管理画面</span>
           </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => logout.mutate()}
+            disabled={logout.isPending}
+            className="gap-1.5 text-muted-foreground"
+            data-testid="button-logout"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            ログアウト
+          </Button>
         </div>
       </header>
       <div className="max-w-5xl mx-auto px-4 md:px-8 py-6">
