@@ -3,6 +3,7 @@
   "version": "1.0.1",
   "type": "module",
   "license": "MIT",
+  "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "build": "tsx script/build.ts",
