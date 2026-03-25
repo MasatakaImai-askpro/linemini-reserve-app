@@ -138,40 +138,7 @@ app.use(express.urlencoded({ extended: false }));
 // ─────────────────────────────
   // 診断エンドポイント
   // ─────────────────────────────
-  // ─────────────────────────────
-  // 一時的パスワードリセット (初回セットアップ用)
-  // ─────────────────────────────
-  app.post("/api/admin/reset-passwords", async (req: any, res: any) => {
-    const { secret } = req.body;
-    if (secret !== "SETUP_2025_KANAGAWA") {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-    try {
-      // SHA256ハッシュで各ユーザーのパスワードを更新
-      const admin123Hash = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9";
-      const shop123Hash = "1f5d9134b47329e61aaf3c2a5a2af8a95d712a6c01ab07b7dc5d2625c8713b54";
-      
-      // Upsert admin user using drizzle query builder
-      const existingAdmin = await db.select().from(users).where(eq(users.username, 'admin'));
-      if (existingAdmin.length > 0) {
-        await db.update(users).set({ passwordHash: admin123Hash }).where(eq(users.username, 'admin'));
-      } else {
-        await db.insert(users).values({ username: 'admin', passwordHash: admin123Hash, role: 'admin' });
-      }
-      
-      // Update all shop users
-      for (const uname of ['shop1', 'shop1_admin', 'shop2_admin', 'shop3_admin']) {
-        const existing = await db.select().from(users).where(eq(users.username, uname));
-        if (existing.length > 0) {
-          await db.update(users).set({ passwordHash: shop123Hash }).where(eq(users.username, uname));
-        }
-      }
-      const allUsers = await db.select().from(users);
-      res.json({ success: true, users: allUsers.map(u => ({ id: u.id, username: u.username, role: u.role })) });
-    } catch (error: any) {
-      res.status(500).json({ message: error?.message });
-    }
-  });
+
 
   // ─────────────────────────────
   // 診断エンドポイント
