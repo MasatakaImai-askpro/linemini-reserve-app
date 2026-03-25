@@ -1,6 +1,7 @@
 import { db } from "./db";
-import { areas, categories, subCategories, shops, coupons, shopCategories } from "@shared/schema";
+import { areas, categories, subCategories, shops, coupons, shopCategories, users } from "@shared/schema";
 import { nanoid } from "nanoid";
+import bcrypt from "bcryptjs";
 
 // ─────────────────────────────
 // エリアマスタ
@@ -499,5 +500,37 @@ export async function seedDatabase() {
     console.log(`Seeded ${seedCoupons.length} coupons`);
   } else {
     console.log(`Coupons already exist (${existingCoupons.length}), skipping...`);
+  }
+
+  // ─────────────────────────────
+  // 初期ユーザー
+  // ─────────────────────────────
+  const existingUsers = await db.select().from(users);
+  if (existingUsers.length === 0) {
+    const adminHash = await bcrypt.hash("admin123", 10);
+    await db.insert(users).values({
+      username: "admin",
+      passwordHash: adminHash,
+      role: "admin",
+      shopId: null,
+    });
+
+    // 予約機能がある店舗に店舗管理者アカウントを作成
+    const reservationShopIds = [1, 3, 6, 17, 20, 24, 26, 28];
+    const allShops = await db.select().from(shops);
+    const reservationShops = allShops.filter(s => reservationShopIds.includes(s.id));
+
+    for (const shop of reservationShops) {
+      const hash = await bcrypt.hash("shop123", 10);
+      await db.insert(users).values({
+        username: `shop${shop.id}`,
+        passwordHash: hash,
+        role: "shop_admin",
+        shopId: shop.id,
+      });
+    }
+    console.log(`Seeded users: admin + ${reservationShops.length} shop admins`);
+  } else {
+    console.log(`Users already exist (${existingUsers.length}), skipping...`);
   }
 }
