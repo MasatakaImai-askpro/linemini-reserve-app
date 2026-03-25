@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { areas, categories, subCategories, shops, coupons, shopCategories, users } from "@shared/schema";
+import { areas, categories, subCategories, shops, coupons, shopCategories, users } from "../shared/schema";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
 
@@ -286,7 +286,7 @@ const seedCoupons = [
   {
     shopName: "麺処 小田原屋",
     title: "LINE公式アカウント限定トッピング無料",
-    description: "LINE公式アカウントを友だち追加で、お好きなトッピングを1つ無料サービス。",
+    description: "LINE公式アカウントを友だち追加で、お好きなトッピングを1つ無料サービス��",
     discountType: "FREE" as const,
     discountValue: 0,
     isFirstTimeOnly: false,

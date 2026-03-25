@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import {
   insertShopSchema,
   insertCouponSchema,
-} from "@shared/schema";
+} from "../shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";

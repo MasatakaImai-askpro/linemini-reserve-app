@@ -11,7 +11,7 @@ import {
   storeSlots, reservations, areas, categories,
   shopCategories, serviceCategories, staffCategories,
   users,
-} from "@shared/schema";
+} from "../shared/schema";
 import { db } from "./db";
 import { eq, desc, and, inArray } from "drizzle-orm";
 
