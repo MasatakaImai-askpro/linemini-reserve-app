@@ -941,23 +941,28 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
       const { shopId, amount, courseId, courseName } = req.body;
       if (!shopId || !amount) return res.status(400).json({ error: "shopId and amount required" });
 
-      const rows = await sql`SELECT stripe_connect_id, stripe_connect_status FROM shops WHERE id = ${shopId}`;
+      const rows = await sql`SELECT id, name, stripe_connect_id FROM shops WHERE id = ${shopId}`;
       if (!rows.length) return res.status(404).json({ error: "Shop not found" });
       const shop = rows[0];
 
       if (!shop.stripe_connect_id) {
-        return res.status(400).json({ error: "This shop has not connected Stripe yet" });
+        return res.status(400).json({ error: "この店舗はStripe Connect未設定です" });
       }
 
       const stripe = await getStripeClient();
+      // テストモード: direct chargeでPaymentIntentを作成（Connect経由の場合はcapabilityが有効になってから）
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(amount),
         currency: 'jpy',
         payment_method_types: ['card'],
         description: courseName || 'コース予約',
-        metadata: { shop_id: String(shopId), course_id: courseId || '' },
-        transfer_data: { destination: shop.stripe_connect_id },
-        application_fee_amount: Math.round(amount * 0.05),
+        metadata: {
+          shop_id: String(shopId),
+          shop_name: shop.name,
+          course_id: courseId || '',
+          course_name: courseName || '',
+          stripe_connect_id: shop.stripe_connect_id,
+        },
       });
 
       res.json({ clientSecret: paymentIntent.client_secret });
