@@ -116,26 +116,6 @@ const db = drizzle(sql, {
 // ─────────────────────────────
 // Express設定
 // ─────────────────────────────
-declare module "express-session" {
-  interface SessionData {
-    userId: number;
-    role: "admin" | "shop_admin";
-    shopId: number | null;
-  }
-}
-
-const app = express();
-
-app.use(session({
-  secret: process.env.SESSION_SECRET || "kanagawa-odekake-secret",
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  },
-}));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
