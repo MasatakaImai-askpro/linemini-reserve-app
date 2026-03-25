@@ -907,8 +907,9 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
   
   
   // ─── Stripe決済エンドポイント ───
-  const getStripeClient = () => {
-    const Stripe = require('stripe');
+  const getStripeClient = async () => {
+    const StripeModule = await import('stripe');
+    const Stripe = StripeModule.default;
     return new Stripe(process.env.STRIPE_SECRET_KEY || '');
   };
 
@@ -948,7 +949,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
         return res.status(400).json({ error: "This shop has not connected Stripe yet" });
       }
 
-      const stripe = getStripeClient();
+      const stripe = await getStripeClient();
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(amount),
         currency: 'jpy',
