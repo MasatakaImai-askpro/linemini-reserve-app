@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import express, { type Request, Response, NextFunction } from "express";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, sql } from "drizzle-orm";
 import {
   pgTable, pgEnum, text, integer, serial,
   boolean, timestamp, uniqueIndex
@@ -130,7 +130,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // ─────────────────────────────
-// エリア
+  // 診断エンドポイント
+  // ─────────────────────────────
+  app.get("/api/diag", async (_req: any, res: any) => {
+    try {
+      const result = await db.execute(sql`SELECT 1 as test`);
+      res.json({ status: "ok", db: result?.rows?.[0] || "connected", env: { hasDbUrl: !!process.env.DATABASE_URL, hasDbUrlUnpooled: !!process.env.DATABASE_URL_UNPOOLED } });
+    } catch (error: any) {
+      res.status(500).json({ status: "error", message: error?.message, stack: error?.stack?.substring(0, 500) });
+    }
+  });
+
+  // ─────────────────────────────
+  // エリア
 // ─────────────────────────────
 app.get("/api/areas", async (_req, res) => {
   try {
