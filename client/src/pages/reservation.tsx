@@ -46,7 +46,7 @@ export default function ReservationPage() {
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [staffSelectionEnabled, setStaffSelectionEnabled] = useState(false);
   const [reservationId, setReservationId] = useState<string | null>(null);
-  const [cancelToken, setCancelToken] = useState<string | null>(null);
+  const [reservationToken, setReservationToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (!shopId) return;
@@ -81,7 +81,7 @@ export default function ReservationPage() {
     setSelectedDate("");
     setSelectedTime("");
     setReservationId(null);
-    setCancelToken(null);
+    setReservationToken(null);
   };
 
   if (isLoading) {
@@ -209,9 +209,9 @@ export default function ReservationPage() {
                 status: "confirmed",
                 paid: selectedCourse!.prepaymentOnly,
               });
-              const result = res as { id: string; cancelToken: string };
+              const result = res as { id: string; reservationToken: string };
               setReservationId(result.id);
-              setCancelToken(result.cancelToken);
+              setReservationToken(result.reservationToken);
               setStep("complete");
             }}
             onBack={() => setStep("datetime")}
@@ -225,7 +225,7 @@ export default function ReservationPage() {
             date={selectedDate}
             time={selectedTime}
             reservationId={reservationId}
-            cancelToken={cancelToken}
+            reservationToken={reservationToken}
             onClose={() => navigate(`/app/shop/${shop.id}`)}
           />
         )}
