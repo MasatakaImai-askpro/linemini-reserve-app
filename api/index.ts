@@ -159,11 +159,12 @@ app.use(express.urlencoded({ extended: false }));
         await db.insert(users).values({ username: 'admin', passwordHash: admin123Hash, role: 'admin' });
       }
       
-      const existingShop1 = await db.select().from(users).where(eq(users.username, 'shop1'));
-      if (existingShop1.length > 0) {
-        await db.update(users).set({ passwordHash: shop123Hash }).where(eq(users.username, 'shop1'));
-      } else {
-        await db.insert(users).values({ username: 'shop1', passwordHash: shop123Hash, role: 'shop_admin', shopId: 1 });
+      // Update all shop users
+      for (const uname of ['shop1', 'shop1_admin', 'shop2_admin', 'shop3_admin']) {
+        const existing = await db.select().from(users).where(eq(users.username, uname));
+        if (existing.length > 0) {
+          await db.update(users).set({ passwordHash: shop123Hash }).where(eq(users.username, uname));
+        }
       }
       const allUsers = await db.select().from(users);
       res.json({ success: true, users: allUsers.map(u => ({ id: u.id, username: u.username, role: u.role })) });
