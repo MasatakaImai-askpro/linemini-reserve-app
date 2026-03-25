@@ -970,23 +970,23 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
           },
         });
       } catch (connectErr) {
-        // テストモード等でcapability未有効の場合はフォールバック
-        if (connectErr.code === 'account_invalid' || connectErr.message?.includes('capability') || connectErr.message?.includes('does not have')) {
-          paymentIntent = await stripe.paymentIntents.create({
-            amount: Math.round(amount),
-            currency: 'jpy',
-            payment_method_types: ['card'],
-            description: courseName || 'コース予約',
-            metadata: {
-              shop_id: String(shopId),
-              shop_name: shop.name,
-              course_id: courseId || '',
-              course_name: courseName || '',
-              stripe_connect_id: shop.stripe_connect_id,
-              note: 'pending_onboarding',
-            },
-          });
-        } else { throw connectErr; }
+        // Stripe Connectエラー時（テストモード・未オンボーディング等）はフォールバック
+        // 本番では店舗がオンボーディングを完了すると transfer_data が有効になる
+        console.warn('Stripe Connect fallback:', connectErr.code, connectErr.message?.substring(0, 80));
+        paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(amount),
+          currency: 'jpy',
+          payment_method_types: ['card'],
+          description: courseName || 'コース予約',
+          metadata: {
+            shop_id: String(shopId),
+            shop_name: shop.name,
+            course_id: courseId || '',
+            course_name: courseName || '',
+            stripe_connect_id: shop.stripe_connect_id,
+            note: 'pending_onboarding_fallback',
+          },
+        });
       }
 
       res.json({ clientSecret: paymentIntent.client_secret });
