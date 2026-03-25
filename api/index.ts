@@ -681,6 +681,228 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
     } catch (e: any) { console.error("seed-test error:", e); res.status(500).json({ message: "Seed test failed", error: e.message }); }
   });
 
+  
+  // ─── 店舗15件一括生成 ───
+  app.post("/api/seed-shops", async (_req, res) => {
+    try {
+      const results: any[] = [];
+
+      // ─── 新規追加店舗11件の定義 ───
+      const newShops = [
+        {
+          slug: "odawara-sushi-takumi", name: "小田原鮨処 匠", area_id: 1, area: "小田原", category: "グルメ", subcategory: "寿司・和食",
+          description: "小田原の新鮮魚介を使った本格江戸前寿司。地魚にこだわり、職人が丁寧に握る一品一品をご堪能ください。",
+          address: "神奈川県小田原市魚町1-5-8", phone: "0465-22-3456", hours: "11:30〜22:00（L.O. 21:00）", closed_days: "毎週月曜日",
+          image_url: "https://images.unsplash.com/photo-1559410545-0bdcd187e0a6?w=800&q=80",
+          gallery_image_urls: ["https://images.unsplash.com/photo-1617196034183-421b4040ed20?w=800&q=80","https://images.unsplash.com/photo-1553621042-f6e147245754?w=800&q=80","https://images.unsplash.com/photo-1559410545-0bdcd187e0a6?w=800&q=80"],
+          display_order: 85, line_account_url: null, reservation_url: null, enable_staff_assignment: false, like_count: 38,
+          coupons: [{ title: "平日ランチ特別割引10%OFF", description: "平日11:30〜14:00のランチタイムに全品10%割引", discount_type: "PERCENTAGE", discount_value: 10, expiry_date: "2026-09-30", is_first_time_only: false, is_line_account_coupon: false }]
+        },
+        {
+          slug: "yamato-cafe-ameli", name: "大和カフェ アメリ", area_id: 2, area: "大和", category: "グルメ", subcategory: "カフェ",
+          description: "大和駅徒歩3分。自家焙煎コーヒーと手作りスイーツが自慢の居心地の良いカフェ。テラス席あり。",
+          address: "神奈川県大和市大和東1-3-22", phone: "046-260-7788", hours: "8:00〜20:00", closed_days: "不定休",
+          image_url: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=800&q=80",
+          gallery_image_urls: ["https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&q=80","https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&q=80","https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=800&q=80"],
+          display_order: 80, line_account_url: "https://line.me/R/ti/p/@cafe-ameli", reservation_url: null, enable_staff_assignment: false, like_count: 62,
+          coupons: [
+            { title: "モーニングセット100円OFF", description: "8:00〜10:00モーニングセットご注文で100円割引", discount_type: "AMOUNT", discount_value: 100, expiry_date: "2026-12-31", is_first_time_only: false, is_line_account_coupon: false },
+            { title: "LINE友達登録でドリンク1杯無料", description: "LINEお友達登録のお客様にドリンク1杯サービス", discount_type: "FREE", discount_value: 0, expiry_date: "2026-12-31", is_first_time_only: true, is_line_account_coupon: true }
+          ]
+        },
+        {
+          slug: "hadano-seikotsu-takahashi", name: "秦野整骨院 たかはし", area_id: 3, area: "秦野", category: "美容・健康", subcategory: "整骨・整体",
+          description: "国家資格取得の柔道整復師が対応。肩こり・腰痛・スポーツ障害など幅広く対応。予約優先制で待ち時間少なめ。",
+          address: "神奈川県秦野市曲松1-2-5", phone: "0463-81-5566", hours: "9:00〜20:00", closed_days: "日曜・祝日",
+          image_url: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80",
+          gallery_image_urls: ["https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&q=80","https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=800&q=80","https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80"],
+          display_order: 75, line_account_url: "https://line.me/R/ti/p/@takahashi-seikotsu", reservation_url: "PLACEHOLDER", enable_staff_assignment: true, like_count: 29,
+          coupons: [{ title: "初回施術1,000円OFF", description: "初めてのお客様限定！初回施術料金から1,000円割引", discount_type: "AMOUNT", discount_value: 1000, expiry_date: "2026-12-31", is_first_time_only: true, is_line_account_coupon: false }],
+          booking: {
+            staff: [{ name: "高橋 誠", role: "院長・柔道整復師", avatar: "高誠" }, { name: "村田 彩", role: "柔道整復師", avatar: "村彩" }],
+            courses: [
+              { name: "肩こり・腰痛コース（30分）", category: "整体", duration: 30, price: 3300, description: "肩こり・腰痛専用の集中整体コース。", prepayment_only: false },
+              { name: "全身バランス調整（60分）", category: "整体", duration: 60, price: 5500, description: "全身のバランスを整える本格施術コース。", prepayment_only: false },
+              { name: "スポーツ障害ケア（45分）", category: "スポーツ", duration: 45, price: 4400, description: "スポーツによる疲労・障害に特化したケア。", prepayment_only: false },
+              { name: "骨盤矯正コース（50分）", category: "矯正", duration: 50, price: 6600, description: "産後ケアや姿勢改善に効果的な骨盤矯正。", prepayment_only: false },
+            ],
+            settings: { store_name: "秦野整骨院 たかはし", store_address: "神奈川県秦野市曲松1-2-5", store_phone: "0463-81-5566", store_email: "info@takahashi-seikotsu.jp", store_hours: "9:00〜20:00", store_closed_days: "日曜・祝日", staff_selection_enabled: "true" }
+          }
+        },
+        {
+          slug: "hiratsuka-yakiniku-toragyu", name: "平塚焼肉 虎牛", area_id: 4, area: "平塚", category: "グルメ", subcategory: "焼肉",
+          description: "国産黒毛和牛専門の本格焼肉店。特上ロース・カルビ・ハラミはじめ、希少部位も取り揃えています。個室完備。",
+          address: "神奈川県平塚市紅谷町3-1 虎牛ビル1F", phone: "0463-21-8877", hours: "17:00〜23:00（L.O. 22:00）", closed_days: "毎週火曜日",
+          image_url: "https://images.unsplash.com/photo-1558030006-450675393462?w=800&q=80",
+          gallery_image_urls: ["https://images.unsplash.com/photo-1544025162-d76694265947?w=800&q=80","https://images.unsplash.com/photo-1558030006-450675393462?w=800&q=80","https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=800&q=80"],
+          display_order: 70, line_account_url: null, reservation_url: null, enable_staff_assignment: false, like_count: 45,
+          coupons: [
+            { title: "平日ディナー1人1,000円OFF", description: "平日17:00〜19:00入店で1人1,000円割引（2名以上）", discount_type: "AMOUNT", discount_value: 1000, expiry_date: "2026-09-30", is_first_time_only: false, is_line_account_coupon: false },
+            { title: "誕生日特典 デザートプレート無料", description: "お誕生日月のお客様にデザートプレートをプレゼント", discount_type: "FREE", discount_value: 0, expiry_date: "2026-12-31", is_first_time_only: false, is_line_account_coupon: false }
+          ]
+        },
+        {
+          slug: "atsugi-fitness-peak", name: "厚木フィットネス PEAK", area_id: 5, area: "厚木", category: "レジャー・体験", subcategory: "スポーツジム",
+          description: "最新マシン完備の24時間ジム。パーソナルトレーニング・ヨガ・ピラティスのレッスンも充実。入会金無料キャンペーン中。",
+          address: "神奈川県厚木市中町2-4-8 PEAKビル3F", phone: "046-223-4455", hours: "24時間営業", closed_days: "年中無休",
+          image_url: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80",
+          gallery_image_urls: ["https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=800&q=80","https://images.unsplash.com/photo-1549060279-7e168fcee0c2?w=800&q=80","https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80"],
+          display_order: 65, line_account_url: "https://line.me/R/ti/p/@fitness-peak", reservation_url: "PLACEHOLDER", enable_staff_assignment: true, like_count: 77,
+          coupons: [{ title: "体験レッスン500円（通常3,300円）", description: "初回体験レッスン限定価格500円でご参加いただけます", discount_type: "AMOUNT", discount_value: 2800, expiry_date: "2026-06-30", is_first_time_only: true, is_line_account_coupon: false }],
+          booking: {
+            staff: [{ name: "松田 健二", role: "パーソナルトレーナー", avatar: "松健" }, { name: "岡田 さやか", role: "ヨガインストラクター", avatar: "岡さ" }, { name: "川口 大輝", role: "ピラティスインストラクター", avatar: "川大" }],
+            courses: [
+              { name: "パーソナルトレーニング（60分）", category: "トレーニング", duration: 60, price: 8800, description: "専属トレーナーが目標に合わせてプログラムを作成します。", prepayment_only: false },
+              { name: "ヨガレッスン（45分）", category: "ヨガ", duration: 45, price: 3300, description: "初心者から上級者まで。心と体を整えるヨガクラス。", prepayment_only: false },
+              { name: "ピラティス（45分）", category: "ピラティス", duration: 45, price: 3300, description: "インナーマッスルを鍛え、姿勢を改善するピラティス。", prepayment_only: false },
+              { name: "ボクシングフィット（45分）", category: "格闘技", duration: 45, price: 4400, description: "ダイエット・ストレス発散に最適なボクシングエクササイズ。", prepayment_only: false },
+              { name: "パーソナル月4回コース", category: "トレーニング", duration: 60, price: 29700, description: "月4回のパーソナルトレーニング。確実に目標達成。", prepayment_only: true },
+            ],
+            settings: { store_name: "厚木フィットネス PEAK", store_address: "神奈川県厚木市中町2-4-8 PEAKビル3F", store_phone: "046-223-4455", store_email: "info@fitness-peak.jp", store_hours: "24時間営業", store_closed_days: "年中無休", staff_selection_enabled: "true" }
+          }
+        },
+        {
+          slug: "odawara-sakagura-kikunosato", name: "小田原酒蔵 菊の里", area_id: 1, area: "小田原", category: "グルメ", subcategory: "居酒屋・和食",
+          description: "地酒と旬の肴が自慢の老舗居酒屋。小田原・神奈川の地酒20種以上を取り揃え。風情ある古民家造りの店内。",
+          address: "神奈川県小田原市本町2-7-3", phone: "0465-23-6677", hours: "17:00〜24:00（L.O. 23:00）", closed_days: "毎週水曜日",
+          image_url: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80",
+          gallery_image_urls: ["https://images.unsplash.com/photo-1514190051997-0f6f39ca5cde?w=800&q=80","https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80","https://images.unsplash.com/photo-1506619216599-9d16d0903dfd?w=800&q=80"],
+          display_order: 60, line_account_url: null, reservation_url: null, enable_staff_assignment: false, like_count: 33,
+          coupons: [{ title: "地酒3種飲み比べセット500円OFF", description: "神奈川地酒3種飲み比べセット（通常2,200円→1,700円）", discount_type: "AMOUNT", discount_value: 500, expiry_date: "2026-09-30", is_first_time_only: false, is_line_account_coupon: false }]
+        },
+        {
+          slug: "yamato-izakaya-mitsuba", name: "大和居酒屋 三葉", area_id: 2, area: "大和", category: "グルメ", subcategory: "居酒屋",
+          description: "地元大和で30年愛され続ける居酒屋。コースは4,000円〜ご宴会・女子会・各種飲み会に最適。貸切も承ります。",
+          address: "神奈川県大和市大和南1-8-12", phone: "046-268-9900", hours: "17:00〜翌1:00（L.O. 24:00）", closed_days: "日曜日",
+          image_url: "https://images.unsplash.com/photo-1514190051997-0f6f39ca5cde?w=800&q=80",
+          gallery_image_urls: ["https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80","https://images.unsplash.com/photo-1514190051997-0f6f39ca5cde?w=800&q=80","https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&q=80"],
+          display_order: 55, line_account_url: "https://line.me/R/ti/p/@izakaya-mitsuba", reservation_url: "PLACEHOLDER", enable_staff_assignment: false, like_count: 51,
+          coupons: [
+            { title: "宴会コース2,000円割引（10名以上）", description: "10名以上のご宴会でコース料金から1人2,000円引き", discount_type: "AMOUNT", discount_value: 2000, expiry_date: "2026-12-31", is_first_time_only: false, is_line_account_coupon: false },
+            { title: "生ビール1杯無料（LINEクーポン）", description: "LINEクーポン提示で生ビール1杯サービス", discount_type: "FREE", discount_value: 0, expiry_date: "2026-09-30", is_first_time_only: false, is_line_account_coupon: true }
+          ],
+          booking: {
+            staff: [{ name: "三葉 一郎", role: "オーナー", avatar: "三一" }],
+            courses: [
+              { name: "スタンダードコース（3時間飲み放題）", category: "宴会", duration: 180, price: 4000, description: "定番料理8品＋3時間飲み放題のスタンダードコース。", prepayment_only: false },
+              { name: "プレミアムコース（4時間飲み放題）", category: "宴会", duration: 240, price: 5500, description: "特選料理12品＋4時間飲み放題のプレミアムコース。", prepayment_only: true },
+              { name: "女子会プラン（2.5時間）", category: "女子会", duration: 150, price: 3500, description: "女子会限定！フォトジェニックなメニュー構成。", prepayment_only: false },
+            ],
+            settings: { store_name: "大和居酒屋 三葉", store_address: "神奈川県大和市大和南1-8-12", store_phone: "046-268-9900", store_email: "info@izakaya-mitsuba.jp", store_hours: "17:00〜翌1:00", store_closed_days: "日曜日", staff_selection_enabled: "false" }
+          }
+        },
+        {
+          slug: "hiratsuka-nail-sakurako", name: "平塚ネイルサロン さくらこ", area_id: 4, area: "平塚", category: "美容・健康", subcategory: "ネイル",
+          description: "平塚駅徒歩2分。上質なジェルネイルとトレンドアートが得意なネイルサロン。完全個室・完全予約制。",
+          address: "神奈川県平塚市宝町4-2 さくらこビル2F", phone: "0463-21-4499", hours: "10:00〜20:00（最終受付 19:00）", closed_days: "毎週月曜日・第3火曜日",
+          image_url: "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=800&q=80",
+          gallery_image_urls: ["https://images.unsplash.com/photo-1604654894610-df63bc536371?w=800&q=80","https://images.unsplash.com/photo-1604654894610-df63bc536371?w=800&q=80","https://images.unsplash.com/photo-1604654894610-df63bc536371?w=800&q=80"],
+          display_order: 50, line_account_url: "https://line.me/R/ti/p/@nail-sakurako", reservation_url: "PLACEHOLDER", enable_staff_assignment: true, like_count: 48,
+          coupons: [{ title: "新規限定15%OFF", description: "ご新規のお客様全メニュー15%割引（ご予約時にお伝えください）", discount_type: "PERCENTAGE", discount_value: 15, expiry_date: "2026-12-31", is_first_time_only: true, is_line_account_coupon: false }],
+          booking: {
+            staff: [{ name: "桜子 エリコ", role: "オーナーネイリスト", avatar: "桜エ" }, { name: "高野 みく", role: "シニアネイリスト", avatar: "高み" }],
+            courses: [
+              { name: "ジェルネイル（ワンカラー）", category: "ネイル", duration: 90, price: 6600, description: "シンプルで美しいワンカラーのジェルネイル。オフ込み。", prepayment_only: false },
+              { name: "ジェルネイル（アート込み）", category: "ネイル", duration: 120, price: 9900, description: "トレンドのアートデザイン込みジェルネイル。", prepayment_only: false },
+              { name: "フットネイル（ジェル）", category: "ネイル", duration: 90, price: 7700, description: "角質ケア込みのフットジェルネイル。", prepayment_only: false },
+              { name: "ブライダルネイル", category: "ブライダル", duration: 180, price: 22000, description: "結婚式当日に対応したブライダルネイルフルコース。", prepayment_only: true },
+            ],
+            settings: { store_name: "平塚ネイルサロン さくらこ", store_address: "神奈川県平塚市宝町4-2 さくらこビル2F", store_phone: "0463-21-4499", store_email: "info@nail-sakurako.jp", store_hours: "10:00〜20:00（最終受付19:00）", store_closed_days: "毎週月曜日・第3火曜日", staff_selection_enabled: "true" }
+          }
+        },
+        {
+          slug: "atsugi-onsen-yuraku", name: "厚木温泉スパ 湯楽", area_id: 5, area: "厚木", category: "レジャー・体験", subcategory: "温泉・スパ",
+          description: "天然温泉を使ったリゾートスパ。露天風呂・サウナ・岩盤浴完備。日帰り入浴から宿泊まで。手ぶらでOK。",
+          address: "神奈川県厚木市飯山温泉3-1-1", phone: "046-241-8800", hours: "10:00〜22:00", closed_days: "年2回メンテナンス休業",
+          image_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80",
+          gallery_image_urls: ["https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80","https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&q=80","https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80"],
+          display_order: 45, line_account_url: "https://line.me/R/ti/p/@onsen-yuraku", reservation_url: null, enable_staff_assignment: false, like_count: 91,
+          coupons: [
+            { title: "日帰り入浴200円割引", description: "日帰り入浴（通常1,200円→1,000円）クーポン提示で", discount_type: "AMOUNT", discount_value: 200, expiry_date: "2026-12-31", is_first_time_only: false, is_line_account_coupon: false },
+            { title: "岩盤浴セット10%OFF", description: "入浴＋岩盤浴セットを10%割引でご利用いただけます", discount_type: "PERCENTAGE", discount_value: 10, expiry_date: "2026-09-30", is_first_time_only: false, is_line_account_coupon: false }
+          ]
+        },
+        {
+          slug: "hadano-bakery-petite-bouquet", name: "秦野パン工房 プチブーケ", area_id: 3, area: "秦野", category: "グルメ", subcategory: "パン・スイーツ",
+          description: "丹沢の天然水を使った自家製天然酵母パンの専門店。毎朝焼きたて50種以上が揃います。イートインスペースあり。",
+          address: "神奈川県秦野市本町2-5-1", phone: "0463-83-1122", hours: "7:00〜19:00（売り切れ次第終了）", closed_days: "毎週火曜日・水曜日",
+          image_url: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80",
+          gallery_image_urls: ["https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&q=80","https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&q=80","https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80"],
+          display_order: 40, line_account_url: null, reservation_url: null, enable_staff_assignment: false, like_count: 66,
+          coupons: [{ title: "5個以上購入で10%OFF", description: "パン5個以上ご購入のお客様に10%割引", discount_type: "PERCENTAGE", discount_value: 10, expiry_date: "2026-12-31", is_first_time_only: false, is_line_account_coupon: false }]
+        },
+        {
+          slug: "odawara-wagashi-tskinowa", name: "小田原和菓子 月の輪", area_id: 1, area: "小田原", category: "グルメ", subcategory: "和菓子",
+          description: "創業明治32年の老舗和菓子店。小田原銘菓「月の輪」をはじめ、季節の生菓子・干菓子など丁寧に作り続けています。",
+          address: "神奈川県小田原市城内1-1 小田原城近く", phone: "0465-23-1234", hours: "9:00〜18:00", closed_days: "毎週木曜日",
+          image_url: "https://images.unsplash.com/photo-1606471191009-63994c53433b?w=800&q=80",
+          gallery_image_urls: ["https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80","https://images.unsplash.com/photo-1606471191009-63994c53433b?w=800&q=80","https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=800&q=80"],
+          display_order: 35, line_account_url: null, reservation_url: null, enable_staff_assignment: false, like_count: 44,
+          coupons: [{ title: "お土産セット5%割引", description: "贈り物・お土産用詰め合わせセット（3,000円以上）5%割引", discount_type: "PERCENTAGE", discount_value: 5, expiry_date: "2026-12-31", is_first_time_only: false, is_line_account_coupon: false }]
+        },
+      ];
+
+      for (const sh of newShops) {
+        // 既存確認
+        const ex = await sql`SELECT id FROM shops WHERE slug = ${sh.slug}`;
+        if (ex.length > 0) {
+          results.push({ slug: sh.slug, status: 'already_exists', id: ex[0].id });
+          continue;
+        }
+        // 店舗挿入
+        const shopRows = await sql`INSERT INTO shops (
+          slug, name, description, area_id, area, category, subcategory,
+          address, phone, hours, closed_days, display_order,
+          line_account_url, image_url, gallery_image_urls,
+          is_active, enable_staff_assignment, like_count
+        ) VALUES (
+          ${sh.slug}, ${sh.name}, ${sh.description}, ${sh.area_id}, ${sh.area}, ${sh.category}, ${sh.subcategory},
+          ${sh.address}, ${sh.phone}, ${sh.hours}, ${sh.closed_days}, ${sh.display_order},
+          ${sh.line_account_url}, ${sh.image_url}, ${sh.gallery_image_urls},
+          true, ${sh.enable_staff_assignment}, ${sh.like_count}
+        ) RETURNING id`;
+        const shopId = shopRows[0].id;
+
+        // reservation_url設定
+        if (sh.reservation_url === "PLACEHOLDER") {
+          await sql`UPDATE shops SET reservation_url = '/app/reservation/' || ${shopId}::text WHERE id = ${shopId}`;
+        }
+
+        // クーポン
+        for (const cp of (sh.coupons || [])) {
+          await sql`INSERT INTO coupons (shop_id, title, description, discount_type, discount_value, expiry_date, is_first_time_only, is_line_account_coupon, is_active)
+            VALUES (${shopId}, ${cp.title}, ${cp.description}, ${cp.discount_type}::discount_type, ${cp.discount_value}, ${cp.expiry_date}, ${cp.is_first_time_only}, ${cp.is_line_account_coupon}, true)`;
+        }
+
+        // booking設定（予約有効店のみ）
+        if (sh.booking) {
+          const bk = sh.booking;
+          const sIds: string[] = [];
+          for (const st of bk.staff) {
+            const row = await sql`INSERT INTO booking_staff (shop_id, name, role, avatar) VALUES (${shopId}, ${st.name}, ${st.role}, ${st.avatar}) RETURNING id`;
+            sIds.push(row[0].id.toString());
+          }
+          for (const c of bk.courses) {
+            await sql`INSERT INTO booking_courses (shop_id, name, category, duration, price, description, prepayment_only, staff_ids)
+              VALUES (${shopId}, ${c.name}, ${c.category}, ${c.duration}, ${c.price}, ${c.description}, ${c.prepayment_only}, ${sIds})`;
+          }
+          const s = bk.settings;
+          await sql`INSERT INTO booking_settings (shop_id, store_name, store_description, store_address, store_phone, store_email, store_hours, store_closed_days, banner_url, staff_selection_enabled)
+            VALUES (${shopId}, ${s.store_name}, ${sh.description}, ${s.store_address}, ${s.store_phone}, ${s.store_email}, ${s.store_hours}, ${s.store_closed_days}, ${sh.image_url}, ${s.staff_selection_enabled})
+            ON CONFLICT (shop_id) DO NOTHING`;
+        }
+
+        results.push({ slug: sh.slug, name: sh.name, status: 'created', id: shopId, coupons: sh.coupons?.length || 0, hasbooking: !!sh.booking });
+      }
+
+      const total = await sql`SELECT COUNT(*) as cnt FROM shops`;
+      res.json({ ok: true, total: parseInt(total[0].cnt), results });
+    } catch (e: any) {
+      console.error("seed-shops error:", e);
+      res.status(500).json({ message: "Seed shops failed", error: e.message });
+    }
+  });
+
   // ─── Error handler ───
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     console.error("Internal error:", err);
