@@ -390,7 +390,8 @@ app.post("/api/auth/login", async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-    const valid = verifyPassword(password, user.passwordHash);
+    // プレーンテキスト比較（ハッシュかプレーンテキストどちらでも対応）
+    const valid = user.passwordHash === password || user.passwordHash === hashPassword(password);
     if (!valid) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
