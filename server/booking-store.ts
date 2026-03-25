@@ -342,6 +342,27 @@ class BookingStore {
   getStaffSlots(staffId: string): SlotEntry[] {
     return this.slots.filter((s) => s.staffId === staffId);
   }
+
+  findAvailableStaff(date: string, time: string, courseId?: string): string | null {
+    // courseIdに対応するスタッフを取得
+    let eligibleStaff = this.staff;
+    if (courseId) {
+      const course = this.courses.find((c) => c.id === courseId);
+      if (course) {
+        eligibleStaff = this.staff.filter((s) => course.staffIds.includes(s.id));
+      }
+    }
+
+    // その時間に予約がないスタッフを探す
+    for (const staff of eligibleStaff) {
+      const slots = this.getTimeSlots(staff.id, date);
+      const slot = slots.find((s) => s.time === time);
+      if (slot && slot.available) {
+        return staff.id;
+      }
+    }
+    return null;
+  }
 }
 
 class BookingStoreManager {
