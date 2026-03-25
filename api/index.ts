@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import express, { type Request, Response, NextFunction } from "express";
-import session from "express-session";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { eq, desc, inArray } from "drizzle-orm";
@@ -12,6 +11,9 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-key-change-in-production";
 
 // ─────────────────────────────
 // DB接続
@@ -387,7 +389,7 @@ app.delete("/api/coupons/:id", async (req, res) => {
 });
 
 // ─────────────────────────────
-// 認証
+// 認証 (JWT)
 // ─────────────────────────────
 app.post("/api/auth/login", async (req, res) => {
   try {
@@ -403,38 +405,46 @@ app.post("/api/auth/login", async (req, res) => {
     if (!valid) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-    req.session.userId = user.id;
-    req.session.role = user.role;
-    req.session.shopId = user.shopId;
-    res.json({ id: user.id, username: user.username, role: user.role, shopId: user.shopId });
+    // JWTトークン生成
+    const token = jwt.sign(
+      { userId: user.id, role: user.role, shopId: user.shopId },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+    res.json({ 
+      id: user.id, 
+      username: user.username, 
+      role: user.role, 
+      shopId: user.shopId,
+      token 
+    });
   } catch (error) {
     console.error("Error logging in:", error);
     res.status(500).json({ message: "Login failed" });
   }
 });
 
-app.post("/api/auth/logout", (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      return res.status(500).json({ message: "Logout failed" });
-    }
-    res.json({ message: "Logged out" });
-  });
+app.post("/api/auth/logout", (_req, res) => {
+  // JWTはステートレスなのでサーバー側で何もしない
+  res.json({ message: "Logged out" });
 });
 
 app.get("/api/auth/me", async (req, res) => {
-  if (!req.session.userId) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ message: "Not authenticated" });
   }
+  const token = authHeader.substring(7);
   try {
-    const [user] = await db.select().from(users).where(eq(users.id, req.session.userId));
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number; role: string; shopId: number | null };
+    const [user] = await db.select().from(users).where(eq(users.id, decoded.userId));
     if (!user) {
       return res.status(401).json({ message: "User not found" });
     }
     res.json({ id: user.id, username: user.username, role: user.role, shopId: user.shopId });
   } catch (error) {
-    console.error("Error fetching user:", error);
-    res.status(500).json({ message: "Failed to fetch user" });
+    console.error("Error verifying token:", error);
+    res.status(401).json({ message: "Invalid token" });
   }
 });
 

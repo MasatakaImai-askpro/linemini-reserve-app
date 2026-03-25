@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 
 export interface AuthUser {
@@ -7,14 +7,38 @@ export interface AuthUser {
   username: string;
   role: "admin" | "shop_admin";
   shopId: number | null;
+  token?: string;
+}
+
+// トークン管理
+const TOKEN_KEY = "auth_token";
+
+export function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function removeToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
 }
 
 export function useAuth() {
   const { data: user, isLoading } = useQuery<AuthUser | null>({
     queryKey: ["/api/auth/me"],
     queryFn: async () => {
-      const res = await fetch("/api/auth/me");
-      if (res.status === 401) return null;
+      const token = getToken();
+      if (!token) return null;
+      const res = await fetch("/api/auth/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) {
+        removeToken();
+        return null;
+      }
       return res.json();
     },
     staleTime: 30000,
@@ -36,6 +60,10 @@ export function useLogin() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "ログインに失敗しました");
+      // トークンを保存
+      if (data.token) {
+        setToken(data.token);
+      }
       return data as AuthUser;
     },
     onSuccess: (user) => {
@@ -54,7 +82,12 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/auth/logout", {});
+      const token = getToken();
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      removeToken();
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/auth/me"], null);
