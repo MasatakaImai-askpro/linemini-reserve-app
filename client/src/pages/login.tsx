@@ -38,7 +38,7 @@ export default function LoginPage() {
                 <Input
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="username"
+                  placeholder="例: admin"
                   className="pl-9"
                   autoComplete="username"
                   data-testid="input-username"
