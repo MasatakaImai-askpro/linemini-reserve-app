@@ -6,9 +6,11 @@ import {
   type StoreSlot, type InsertStoreSlot,
   type Reservation, type InsertReservation,
   type Area, type Category,
+  type User, type InsertUser,
   shops, coupons, storeStaff, storeServices,
   storeSlots, reservations, areas, categories,
   shopCategories, serviceCategories, staffCategories,
+  users,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, inArray } from "drizzle-orm";
@@ -63,6 +65,12 @@ export interface IStorage {
   createReservation(reservation: InsertReservation): Promise<Reservation>;
   updateReservation(id: number, data: Partial<InsertReservation>): Promise<Reservation | undefined>;
   deleteReservation(id: number): Promise<boolean>;
+
+  // ユーザー
+  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserById(id: number): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  getUsersByShopId(shopId: number): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -286,6 +294,28 @@ export class DatabaseStorage implements IStorage {
   async deleteReservation(id: number): Promise<boolean> {
     const result = await db.delete(reservations).where(eq(reservations.id, id)).returning();
     return result.length > 0;
+  }
+
+  // ─────────────────────────────
+  // ユーザー
+  // ─────────────────────────────
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async getUserById(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [created] = await db.insert(users).values(user).returning();
+    return created;
+  }
+
+  async getUsersByShopId(shopId: number): Promise<User[]> {
+    return db.select().from(users).where(eq(users.shopId, shopId));
   }
 }
 

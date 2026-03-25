@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -14,6 +14,10 @@ import AdminPage from "@/pages/admin";
 import ShopAdminPage from "@/pages/shop-admin";
 import LineDemoPage from "@/pages/line-demo";
 import CancelPage from "@/pages/cancel";
+import LoginPage from "@/pages/login";
+import { useAuth } from "@/hooks/use-auth";
+import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
 
 function LineAppRouter() {
   return (
@@ -30,6 +34,56 @@ function LineAppRouter() {
   );
 }
 
+function AdminRoute() {
+  const { user, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) {
+      navigate("/login");
+    } else if (user.role === "shop_admin") {
+      navigate(`/admin/shop/${user.shopId}`);
+    }
+  }, [user, isLoading, navigate]);
+
+  if (isLoading) return <LoadingScreen />;
+  if (!user || user.role !== "admin") return null;
+  return <AdminPage />;
+}
+
+function ShopAdminRoute() {
+  const { user, isLoading } = useAuth();
+  const [location, navigate] = useLocation();
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    if (user.role === "shop_admin") {
+      const match = location.match(/\/admin\/shop\/(\d+)/);
+      const routeShopId = match ? parseInt(match[1]) : null;
+      if (routeShopId && routeShopId !== user.shopId) {
+        navigate(`/admin/shop/${user.shopId}`);
+      }
+    }
+  }, [user, isLoading, navigate, location]);
+
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return null;
+  return <ShopAdminPage />;
+}
+
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -37,8 +91,9 @@ function App() {
         <Toaster />
         <Switch>
           <Route path="/" component={LandingPage} />
-          <Route path="/admin" component={AdminPage} />
-          <Route path="/admin/shop/:id" component={ShopAdminPage} />
+          <Route path="/login" component={LoginPage} />
+          <Route path="/admin" component={AdminRoute} />
+          <Route path="/admin/shop/:id" component={ShopAdminRoute} />
           <Route path="/line" component={LineDemoPage} />
           <Route path="/reservation/:id" component={ReservationPage} />
           <Route path="/cancel/:shopId/:token" component={CancelPage} />

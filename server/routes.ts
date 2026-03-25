@@ -8,9 +8,11 @@ import {
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import express from "express";
 import { nanoid } from "nanoid";
 import { bookingManager } from "./booking-store";
+import bcrypt from "bcryptjs";
 
 const uploadsDir = path.join(process.cwd(), "server", "uploads");
 fs.mkdirSync(uploadsDir, { recursive: true });
@@ -363,9 +365,9 @@ export async function registerRoutes(
     const shopId = parseInt(req.params.shopId);
     const store = bookingManager.getStore(shopId);
     if (!store) return res.json([]);
-    const { staffId, date } = req.query as { staffId?: string; date?: string };
+    const { staffId, date, courseId } = req.query as { staffId?: string; date?: string; courseId?: string };
     if (staffId && date) {
-      return res.json(store.getTimeSlots(staffId, date));
+      return res.json(store.getTimeSlots(staffId, date, courseId));
     }
     if (staffId) {
       return res.json(store.getStaffSlots(staffId));
@@ -450,12 +452,27 @@ export async function registerRoutes(
     const store = bookingManager.getStore(shopId);
     if (!store) return res.status(404).json({ message: "Shop not found" });
     const token = store.genToken();
+
+    let { staffId, date, time, courseId, ...rest } = req.body;
+
+    // スタッフあり設定で指名なし（staffId === "__shop__"）の場合、空きスタッフを自動アサイン
+    if (staffId === "__shop__" && store.settings.staff_selection_enabled === "true") {
+      const assignedStaffId = store.findAvailableStaff(date, time, courseId);
+      if (assignedStaffId) {
+        staffId = assignedStaffId;
+      }
+    }
+
     const newReservation = {
       id: `r${shopId}-${store.genId()}`,
       reservationToken: token,
       status: "confirmed" as const,
       paid: false,
-      ...req.body,
+      staffId,
+      date,
+      time,
+      courseId,
+      ...rest,
     };
     store.reservations.push(newReservation);
     res.status(201).json(newReservation);
@@ -546,6 +563,199 @@ export async function registerRoutes(
     if (idx < 0) return res.status(404).json({ message: "Inquiry not found" });
     store.inquiries[idx] = { ...store.inquiries[idx], ...rest };
     res.json(store.inquiries[idx]);
+  });
+
+  // Stripe Connect: 連携状態を返す（Stripe APIで実際の状態を確認）
+  app.get("/api/stripe/connect/status/:shopId", async (req, res) => {
+    try {
+      const shopId = Number(req.params.shopId);
+      const shop = await storage.getShopById(shopId);
+      if (!shop) return res.status(404).json({ message: "Shop not found" });
+
+      // アカウントIDがなければ未連携
+      if (!shop.stripeConnectId) {
+        return res.json({ connected: false, status: "none", accountId: null });
+      }
+
+      // Stripe APIでリアルタイム確認
+      try {
+        const stripe = await getUncachableStripeClient();
+        const account = await stripe.accounts.retrieve(shop.stripeConnectId);
+        const isActive = !!(account.charges_enabled && account.payouts_enabled);
+        const newStatus = isActive ? "active" : "pending";
+
+        // DBのステータスが変わっていれば更新
+        if (shop.stripeConnectStatus !== newStatus) {
+          await storage.updateShop(shopId, { stripeConnectStatus: newStatus });
+        }
+
+        return res.json({
+          connected: isActive,
+          status: newStatus,
+          accountId: shop.stripeConnectId,
+        });
+      } catch (stripeErr: any) {
+        // Stripe API エラーの場合はDB値を使う
+        return res.json({
+          connected: shop.stripeConnectStatus === "active",
+          status: shop.stripeConnectStatus || "none",
+          accountId: shop.stripeConnectId,
+        });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Stripe Connect: オンボーディング開始（アカウント作成 + AccountLink）
+  app.post("/api/stripe/connect/onboard/:shopId", async (req, res) => {
+    try {
+      const shopId = Number(req.params.shopId);
+      const shop = await storage.getShopById(shopId);
+      if (!shop) return res.status(404).json({ message: "Shop not found" });
+
+      const stripe = await getUncachableStripeClient();
+      let accountId = shop.stripeConnectId;
+
+      if (!accountId) {
+        const account = await stripe.accounts.create({
+          type: "express",
+          country: "JP",
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true },
+          },
+        });
+        accountId = account.id;
+        await storage.updateShop(shopId, { stripeConnectId: accountId, stripeConnectStatus: "pending" });
+      } else {
+        // 既存アカウントに capabilities を確保
+        await stripe.accounts.update(accountId, {
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true },
+          },
+        });
+      }
+
+      const domain = process.env.REPLIT_DEV_DOMAIN
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : `http://localhost:5000`;
+
+      const link = await stripe.accountLinks.create({
+        account: accountId,
+        refresh_url: `${domain}/admin`,
+        return_url: `${domain}/admin`,
+        type: "account_onboarding",
+      });
+
+      res.json({ url: link.url });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Stripe Connect: ダッシュボード LoginLink
+  app.post("/api/stripe/connect/dashboard/:shopId", async (req, res) => {
+    try {
+      const shop = await storage.getShopById(Number(req.params.shopId));
+      if (!shop?.stripeConnectId) return res.status(400).json({ error: "Stripe未連携です" });
+
+      const stripe = await getUncachableStripeClient();
+      const loginLink = await stripe.accounts.createLoginLink(shop.stripeConnectId);
+      res.json({ url: loginLink.url });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Stripe: publishable key を返す
+  app.get("/api/stripe/config", async (_req, res) => {
+    try {
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch {
+      res.json({ publishableKey: null });
+    }
+  });
+
+  // Stripe Connect: payment intent 作成
+  app.post("/api/stripe/connect/payment-intent", async (req, res) => {
+    try {
+      const { shopId, amount, currency = "jpy", description } = req.body;
+      const shop = await storage.getShopById(Number(shopId));
+      if (!shop?.stripeConnectId) {
+        return res.status(400).json({ error: "この店舗はStripe Connect未設定です。当日店舗にてお支払いください。" });
+      }
+      const stripe = await getUncachableStripeClient();
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Number(amount),
+        currency,
+        description,
+        transfer_data: { destination: shop.stripeConnectId },
+      });
+      res.json({ clientSecret: paymentIntent.client_secret });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "決済の準備に失敗しました" });
+    }
+  });
+
+  // ─────────────────────────────
+  // 認証 API
+  // ─────────────────────────────
+
+  // ログイン
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ message: "ユーザー名とパスワードを入力してください" });
+      }
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ message: "ユーザー名またはパスワードが間違っています" });
+      }
+      const valid = await bcrypt.compare(password, user.passwordHash);
+      if (!valid) {
+        return res.status(401).json({ message: "ユーザー名またはパスワードが間違っています" });
+      }
+      req.session.userId = user.id;
+      req.session.role = user.role;
+      req.session.shopId = user.shopId ?? null;
+      res.json({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        shopId: user.shopId ?? null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // 現在のユーザー情報
+  app.get("/api/auth/me", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "ログインしていません" });
+    }
+    const user = await storage.getUserById(req.session.userId);
+    if (!user) {
+      req.session.destroy(() => {});
+      return res.status(401).json({ message: "ユーザーが見つかりません" });
+    }
+    res.json({
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      shopId: user.shopId ?? null,
+    });
+  });
+
+  // ログアウト
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy(() => {
+      res.json({ message: "ログアウトしました" });
+    });
   });
 
   return httpServer;

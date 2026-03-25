@@ -1,12 +1,15 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link, useParams, useLocation } from "wouter";
+import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useLogout } from "@/hooks/use-auth";
 import {
-  ArrowLeft,
   Store,
+  LogOut,
   ListOrdered,
   Users,
   Clock,
@@ -15,7 +18,15 @@ import {
   Save,
   X,
   Upload,
+  Settings,
+  LayoutGrid,
+  CreditCard,
+  CircleCheck,
+  CircleAlert,
+  CircleDashed,
+  ExternalLink,
 } from "lucide-react";
+import { SiStripe } from "react-icons/si";
 import type { Shop } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -23,8 +34,9 @@ import { CourseManagement } from "@/components/admin/course-management";
 import { StaffManagement } from "@/components/admin/staff-management";
 import { SlotManagement } from "@/components/admin/slot-management";
 import { ReservationList } from "@/components/admin/reservation-list";
+import { fetchSettings, updateSettings } from "@/lib/booking-api";
 
-type ShopAdminTab = "images" | "courses" | "staff" | "slots" | "reservations";
+type ShopAdminTab = "images" | "courses" | "staff" | "slots" | "reservations" | "settings" | "payment";
 
 function ImageUploadSlot({
   label,
@@ -102,6 +114,269 @@ function ImageUploadSlot({
           data-testid={previewTestId}
         />
       )}
+    </div>
+  );
+}
+
+function StripeConnectPanel({ shopId }: { shopId: number }) {
+  const { toast } = useToast();
+
+  const { data: stripeStatus, refetch: refetchStripeStatus } = useQuery({
+    queryKey: ["/api/stripe/connect/status", shopId],
+    queryFn: async () => {
+      const res = await fetch(`/api/stripe/connect/status/${shopId}`);
+      return res.json();
+    },
+    staleTime: 30000,
+  });
+
+  const onboardMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/stripe/connect/onboard/${shopId}`, {});
+      const data = await res.json();
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.open(data.url, "_blank");
+        setTimeout(() => refetchStripeStatus(), 3000);
+      } else {
+        toast({ title: "Stripe接続の開始に失敗しました", description: data.error || "", variant: "destructive" });
+      }
+    },
+    onError: (err: any) => {
+      const msg = err?.message || "";
+      const isSettingsError = msg.includes("Country and Capabilities") || msg.includes("capabilities");
+      toast({
+        title: "Stripe接続の開始に失敗しました",
+        description: isSettingsError
+          ? "StripeダッシュボードでJPのExpress機能を有効化してください"
+          : msg.split(":").slice(1).join(":").trim() || "しばらくしてから再度お試しください",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const dashboardMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/stripe/connect/dashboard/${shopId}`, {});
+      const data = await res.json();
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data.url) window.open(data.url, "_blank");
+    },
+    onError: (err: any) => {
+      const msg = err?.message?.split(":").slice(1).join(":").trim() || "";
+      toast({ title: "ダッシュボードのリンク取得に失敗しました", description: msg, variant: "destructive" });
+    },
+  });
+
+  return (
+    <div data-testid="admin-shop-payment">
+      <div className="mb-4">
+        <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+          <SiStripe className="w-5 h-5 text-[#635BFF]" />
+          Stripe Connect 決済連携
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          前払いコースのオンライン決済を受け取るためのStripe Connect設定
+        </p>
+      </div>
+
+      <Card className="overflow-visible p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          {stripeStatus?.connected ? (
+            <CircleCheck className="w-5 h-5 text-green-600" />
+          ) : stripeStatus?.status === "pending" ? (
+            <CircleAlert className="w-5 h-5 text-amber-500" />
+          ) : (
+            <CircleDashed className="w-5 h-5 text-muted-foreground" />
+          )}
+          <span className="text-sm font-semibold">
+            {stripeStatus?.connected
+              ? "接続済み（決済受取可能）"
+              : stripeStatus?.status === "pending"
+              ? "設定中（オンボーディング未完了）"
+              : "未接続"}
+          </span>
+          {stripeStatus?.accountId && (
+            <span className="text-xs text-muted-foreground ml-auto font-mono">{stripeStatus.accountId}</span>
+          )}
+        </div>
+
+        {!stripeStatus?.connected && (
+          <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2.5 text-xs text-blue-800" data-testid="notice-stripe-incomplete">
+            <span className="font-semibold">Stripe Connectの設定が完了すれば、事前決済のコースがご利用いただけます。</span>
+            {stripeStatus?.status === "pending" && (
+              <span className="block mt-1">オンボーディングが未完了です。「設定を再開」から手続きを完了してください。</span>
+            )}
+          </div>
+        )}
+
+        {stripeStatus?.connected && (
+          <div className="rounded-md bg-green-50 border border-green-200 px-3 py-2.5 text-xs text-green-800">
+            前払いコースの決済を受け取る準備ができています。
+          </div>
+        )}
+
+        <div className="flex gap-2 flex-wrap">
+          {!stripeStatus?.connected && (
+            <Button
+              size="sm"
+              className="gap-1.5 bg-[#635BFF] hover:bg-[#635BFF]/90 text-white"
+              onClick={() => onboardMutation.mutate()}
+              disabled={onboardMutation.isPending}
+              data-testid="button-stripe-onboard"
+            >
+              <CreditCard className="w-3.5 h-3.5" />
+              {onboardMutation.isPending ? "処理中..." :
+                stripeStatus?.status === "pending" ? "設定を再開" : "Stripe連携を開始"}
+            </Button>
+          )}
+          {stripeStatus?.connected && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => dashboardMutation.mutate()}
+              disabled={dashboardMutation.isPending}
+              data-testid="button-stripe-dashboard"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              {dashboardMutation.isPending ? "取得中..." : "Stripeダッシュボードを開く"}
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-xs text-muted-foreground"
+            onClick={() => refetchStripeStatus()}
+            data-testid="button-stripe-refresh"
+          >
+            状態を更新
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function ShopSettingsPanel({ shopId }: { shopId: number }) {
+  const { toast } = useToast();
+  const [tableCount, setTableCount] = useState("");
+  const [maxPartySize, setMaxPartySize] = useState("");
+  const [staffSelectionEnabled, setStaffSelectionEnabled] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetchSettings(shopId).then((s) => {
+      setTableCount(s.table_count ?? "");
+      setMaxPartySize(s.max_party_size ?? "");
+      setStaffSelectionEnabled(s.staff_selection_enabled === "true");
+      setLoaded(true);
+    });
+  }, [shopId]);
+
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateSettings(shopId, {
+        table_count: tableCount || "0",
+        max_party_size: maxPartySize || "0",
+      });
+      toast({ title: "設定を保存しました" });
+    } catch {
+      toast({ title: "保存に失敗しました", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!loaded) return <div className="py-10 text-center text-muted-foreground text-sm">読み込み中...</div>;
+
+  if (staffSelectionEnabled) {
+    return (
+      <div data-testid="admin-shop-settings">
+        <div className="mb-4">
+          <h2 className="text-lg font-bold text-foreground">予約設定</h2>
+        </div>
+        <Card className="overflow-visible p-5">
+          <p className="text-sm text-muted-foreground">
+            スタッフ指名ありの店舗では、卓数・上限人数の設定は不要です。
+            スタッフ個別の予約枠管理をご利用ください。
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid="admin-shop-settings">
+      <div className="mb-4">
+        <h2 className="text-lg font-bold text-foreground">予約設定</h2>
+        <p className="text-sm text-muted-foreground">指名なし予約の同時受付数と1予約あたりの上限人数を設定</p>
+      </div>
+      <Card className="overflow-visible p-5 space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="table-count" className="flex items-center gap-1.5 text-sm font-semibold">
+            <LayoutGrid className="h-4 w-4 text-primary" />
+            卓数（同時に受け付ける予約の最大数）
+          </Label>
+          <div className="flex items-center gap-3 max-w-xs">
+            <Input
+              id="table-count"
+              type="number"
+              min="0"
+              max="100"
+              value={tableCount}
+              onChange={(e) => setTableCount(e.target.value)}
+              placeholder="例: 5"
+              className="w-28"
+              data-testid="input-table-count"
+            />
+            <span className="text-sm text-muted-foreground">卓 / 台 / 組</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            同じ時間帯に受け付ける予約の最大数です。0または空欄の場合はスタッフの空き状況で制御されます。
+          </p>
+        </div>
+
+        <div className="border-t pt-5 space-y-2">
+          <Label htmlFor="max-party-size" className="flex items-center gap-1.5 text-sm font-semibold">
+            <Users className="h-4 w-4 text-primary" />
+            1予約あたりの上限人数
+          </Label>
+          <div className="flex items-center gap-3 max-w-xs">
+            <Input
+              id="max-party-size"
+              type="number"
+              min="0"
+              max="100"
+              value={maxPartySize}
+              onChange={(e) => setMaxPartySize(e.target.value)}
+              placeholder="例: 6"
+              className="w-28"
+              data-testid="input-max-party-size"
+            />
+            <span className="text-sm text-muted-foreground">名まで</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            予約確認画面で選択できる人数の上限です。0または空欄の場合は最大20名まで選択可能です。
+          </p>
+        </div>
+
+        <Button
+          onClick={handleSave}
+          disabled={saving}
+          data-testid="button-save-shop-settings"
+        >
+          <Save className="w-4 h-4 mr-1" />
+          {saving ? "保存中..." : "設定を保存"}
+        </Button>
+      </Card>
     </div>
   );
 }
@@ -190,10 +465,27 @@ function ImageManagement({ shop }: { shop: Shop }) {
   );
 }
 
+function LogoutButton() {
+  const logout = useLogout();
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      onClick={() => logout.mutate()}
+      disabled={logout.isPending}
+      className="gap-1.5 text-muted-foreground"
+      data-testid="button-logout"
+    >
+      <LogOut className="w-3.5 h-3.5" />
+      ログアウト
+    </Button>
+  );
+}
+
 export default function ShopAdminPage() {
   const params = useParams<{ id: string }>();
   const shopId = parseInt(params.id || "0");
-  const [, navigate] = useLocation();
+
   const [activeTab, setActiveTab] = useState<ShopAdminTab>("images");
 
   const { data: shop, isLoading } = useQuery<Shop>({
@@ -211,6 +503,8 @@ export default function ShopAdminPage() {
     { id: "staff", label: "スタッフ管理", icon: Users },
     { id: "slots", label: "予約枠管理", icon: Clock },
     { id: "reservations", label: "予約一覧", icon: CalendarCheck },
+    { id: "settings", label: "予約設定", icon: Settings },
+    { id: "payment", label: "決済設定", icon: CreditCard },
   ];
 
   if (isLoading) {
@@ -236,9 +530,6 @@ export default function ShopAdminPage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="p-8 text-center overflow-visible">
           <h2 className="font-bold text-lg mb-2">店舗が見つかりませんでした</h2>
-          <Button variant="outline" onClick={() => navigate("/admin")}>
-            管理画面に戻る
-          </Button>
         </Card>
       </div>
     );
@@ -250,11 +541,8 @@ export default function ShopAdminPage() {
         <Card className="p-8 text-center overflow-visible">
           <h2 className="font-bold text-lg mb-2">予約機能が無効です</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            この店舗の予約機能は有効になっていません。管理画面から予約機能を有効にしてください。
+            この店舗の予約機能は有効になっていません。予約機能を有効にするには管理者にお問い合わせください。
           </p>
-          <Button variant="outline" onClick={() => navigate("/admin")}>
-            管理画面に戻る
-          </Button>
         </Card>
       </div>
     );
@@ -264,15 +552,11 @@ export default function ShopAdminPage() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b">
         <div className="flex items-center gap-2 px-4 md:px-8 h-14">
-          <Link href="/admin" data-testid="button-shop-admin-back">
-            <Button size="icon" variant="ghost">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1">
             <Store className="w-4 h-4 text-primary" />
             <span className="font-bold text-sm" data-testid="text-shop-admin-title">店舗管理</span>
           </div>
+          <LogoutButton />
         </div>
       </header>
       <div className="max-w-5xl mx-auto px-4 md:px-8 py-6">
@@ -318,6 +602,8 @@ export default function ShopAdminPage() {
         {activeTab === "staff" && <StaffManagement shopId={shopId} />}
         {activeTab === "slots" && <SlotManagement shopId={shopId} />}
         {activeTab === "reservations" && <ReservationList shopId={shopId} />}
+        {activeTab === "settings" && <ShopSettingsPanel shopId={shopId} />}
+        {activeTab === "payment" && <StripeConnectPanel shopId={shopId} />}
       </div>
     </div>
   );
