@@ -1061,8 +1061,8 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
         const link = await stripe.accountLinks.create({
           account: accountId,
-          refresh_url: `${domain}/admin`,
-          return_url: `${domain}/admin`,
+          refresh_url: `${domain}/admin/shop/${shopId}`,
+          return_url: `${domain}/admin/shop/${shopId}`,
           type: "account_onboarding",
         });
 
