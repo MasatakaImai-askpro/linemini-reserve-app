@@ -6,6 +6,7 @@ import { ja } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
@@ -20,7 +21,9 @@ interface PaymentConfirmProps {
   staff: Staff | null;
   date: string;
   time: string;
-  onConfirm: (info: { customerName: string; customerEmail: string; customerPhone: string }) => void;
+  maxPartySize?: number;
+  staffSelectionEnabled?: boolean;
+  onConfirm: (info: { customerName: string; customerEmail: string; customerPhone: string; partySize?: number }) => void;
   onBack: () => void;
 }
 
@@ -178,6 +181,8 @@ export function PaymentConfirm({
   staff,
   date,
   time,
+  maxPartySize = 20,
+  staffSelectionEnabled = false,
   onConfirm,
   onBack,
 }: PaymentConfirmProps) {
@@ -185,10 +190,13 @@ export function PaymentConfirm({
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [partySize, setPartySize] = useState(1);
   const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string }>({});
   const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
   const [formSubmitted, setFormSubmitted] = useState(false);
 
+  // スタッフなし設定の店舗のみ人数セレクタを表示
+  const showPartySize = !staffSelectionEnabled;
   const needsPayment = course.prepaymentOnly && course.price > 0;
 
   useEffect(() => {
@@ -209,12 +217,14 @@ export function PaymentConfirm({
 
   const handleNext = () => {
     if (!validate()) return;
+    const info = {
+      customerName: customerName.trim(),
+      customerEmail: customerEmail.trim(),
+      customerPhone: customerPhone.trim(),
+      partySize: showPartySize ? partySize : undefined,
+    };
     if (!needsPayment) {
-      onConfirm({
-        customerName: customerName.trim(),
-        customerEmail: customerEmail.trim(),
-        customerPhone: customerPhone.trim(),
-      });
+      onConfirm(info);
     } else {
       setFormSubmitted(true);
     }
@@ -248,6 +258,12 @@ export function PaymentConfirm({
           <div className="mt-0.5 text-xs text-muted-foreground">{formatDuration(course.duration)}</div>
         </div>
       </div>
+      {showPartySize && (
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="text-sm text-muted-foreground">人数</span>
+          <span className="text-sm font-bold text-foreground" data-testid="text-confirm-party-size">{partySize}名</span>
+        </div>
+      )}
       <div className="flex items-center justify-between px-4 py-3">
         <span className="text-sm font-bold text-foreground">お支払い金額</span>
         <span className="text-xl font-bold text-primary" data-testid="text-confirm-price">{formatPrice(course.price)}</span>
@@ -286,6 +302,7 @@ export function PaymentConfirm({
               customerName: customerName.trim(),
               customerEmail: customerEmail.trim(),
               customerPhone: customerPhone.trim(),
+              partySize: showPartySize ? partySize : undefined,
             })}
             onBack={() => setFormSubmitted(false)}
           >
@@ -355,6 +372,28 @@ export function PaymentConfirm({
           />
           {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
         </div>
+
+        {showPartySize && (
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5 text-xs font-medium">
+              <User className="h-3.5 w-3.5" />
+              人数
+            </Label>
+            <Select
+              value={String(partySize)}
+              onValueChange={(v) => setPartySize(Number(v))}
+            >
+              <SelectTrigger data-testid="select-party-size">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: maxPartySize }, (_, i) => i + 1).map((n) => (
+                  <SelectItem key={n} value={String(n)}>{n}名</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-2 border-t border-border bg-card px-4 py-4">

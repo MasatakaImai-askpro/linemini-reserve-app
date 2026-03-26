@@ -45,6 +45,7 @@ export default function ReservationPage() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [staffSelectionEnabled, setStaffSelectionEnabled] = useState(false);
+  const [maxPartySize, setMaxPartySize] = useState(20);
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [reservationToken, setReservationToken] = useState<string | null>(null);
 
@@ -52,6 +53,7 @@ export default function ReservationPage() {
     if (!shopId) return;
     fetchSettings(shopId).then((s) => {
       setStaffSelectionEnabled(s.staff_selection_enabled === "true");
+      if (s.max_party_size) setMaxPartySize(parseInt(s.max_party_size, 10));
     }).catch(() => {});
   }, [shopId]);
 
@@ -199,7 +201,9 @@ export default function ReservationPage() {
             staff={selectedStaff}
             date={selectedDate}
             time={selectedTime}
-            onConfirm={async ({ customerName, customerEmail, customerPhone }) => {
+            maxPartySize={maxPartySize}
+            staffSelectionEnabled={staffSelectionEnabled}
+            onConfirm={async ({ customerName, customerEmail, customerPhone, partySize }) => {
               const res = await createReservation(shopId, {
                 customerName,
                 customerEmail,
@@ -210,6 +214,7 @@ export default function ReservationPage() {
                 courseId: selectedCourse!.id,
                 status: "confirmed",
                 paid: selectedCourse!.prepaymentOnly,
+                partySize,
               });
               const result = res as { id: string; reservationToken: string };
               setReservationId(result.id);

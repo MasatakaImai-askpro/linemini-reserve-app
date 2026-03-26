@@ -34,6 +34,7 @@ export interface Reservation {
   courseId: string;
   status: "confirmed" | "pending" | "cancelled";
   paid: boolean;
+  partySize?: number;
 }
 
 export interface CancelInfo {
@@ -64,6 +65,8 @@ export interface StoreSettings {
   store_closed_days: string;
   banner_url: string;
   staff_selection_enabled: string;
+  table_count?: string;
+  max_party_size?: string;
 }
 
 export const SHOP_STAFF_ID = "__shop__";
@@ -120,9 +123,10 @@ export const updateReservation = (shopId: number, data: { id: string; status?: s
 export const deleteReservation = (shopId: number, id: string) =>
   api(`/api/shops/${shopId}/reservations?id=${id}`, { method: "DELETE" });
 
-export const fetchSlots = (shopId: number, staffId: string, date?: string) => {
+export const fetchSlots = (shopId: number, staffId: string, date?: string, courseId?: string) => {
   const params = new URLSearchParams({ staffId });
   if (date) params.set("date", date);
+  if (courseId) params.set("courseId", courseId);
   return api<Array<{ time: string; available: boolean }>>(`/api/shops/${shopId}/slots?${params}`);
 };
 

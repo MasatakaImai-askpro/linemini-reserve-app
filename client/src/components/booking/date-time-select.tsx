@@ -55,7 +55,7 @@ export function DateTimeSelect({ shopId, course, staff, onSelect }: DateTimeSele
     const staffId = staff?.id || SHOP_STAFF_ID;
     const dateStr = format(selectedDate, "yyyy-MM-dd");
     setLoadingSlots(true);
-    fetchSlots(shopId, staffId, dateStr).then((slots) => {
+    fetchSlots(shopId, staffId, dateStr, course.id).then((slots) => {
       setTimeSlots(slots);
     }).catch(() => {
       setTimeSlots([]);

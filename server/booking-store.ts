@@ -36,6 +36,7 @@ export interface Reservation {
   courseId: string;
   status: "confirmed" | "pending" | "cancelled";
   paid: boolean;
+  partySize?: number;
   reservationToken?: string;
 }
 
@@ -89,6 +90,8 @@ const SHOP_BOOKING_DATA: Record<number, ShopBookingData> = {
       store_closed_days: "毎週水曜日",
       banner_url: "",
       staff_selection_enabled: "false",
+      table_count: "5",
+      max_party_size: "6",
     },
   },
   3: {
@@ -199,6 +202,8 @@ const SHOP_BOOKING_DATA: Record<number, ShopBookingData> = {
       store_closed_days: "年中無休",
       banner_url: "",
       staff_selection_enabled: "false",
+      table_count: "3",
+      max_party_size: "2",
     },
   },
   24: {
@@ -225,6 +230,8 @@ const SHOP_BOOKING_DATA: Record<number, ShopBookingData> = {
       store_closed_days: "毎週火曜日",
       banner_url: "",
       staff_selection_enabled: "false",
+      table_count: "10",
+      max_party_size: "8",
     },
   },
   26: {
@@ -250,6 +257,8 @@ const SHOP_BOOKING_DATA: Record<number, ShopBookingData> = {
       store_closed_days: "毎週木曜日",
       banner_url: "",
       staff_selection_enabled: "false",
+      table_count: "6",
+      max_party_size: "4",
     },
   },
   28: {
@@ -306,60 +315,162 @@ class BookingStore {
     return randomBytes(32).toString("hex");
   }
 
-  getTimeSlots(staffId: string, date: string): TimeSlot[] {
-    const dateObj = new Date(date);
+  // 予約済み時間から、コースdurationを考慮してブロックされるスロットセットを返す
+  private getBlockedSlots(staffId: string, date: string): Set<string> {
+    const blocked = new Set<string>();
+    const staffReservations = this.reservations.filter(
+      (r) => r.date === date && r.staffId === staffId && r.status !== "cancelled"
+    );
+    for (const r of staffReservations) {
+      const course = this.courses.find((c) => c.id === r.courseId);
+      const duration = course?.duration ?? 30;
+      const slotsNeeded = Math.ceil(duration / 30);
+      const [rh, rm] = r.time.split(":").map(Number);
+      let totalMin = rh * 60 + rm;
+      for (let i = 0; i < slotsNeeded; i++) {
+        const sh = Math.floor(totalMin / 60);
+        const sm = totalMin % 60;
+        blocked.add(`${sh}:${String(sm).padStart(2, "0")}`);
+        totalMin += 30;
+      }
+    }
+    return blocked;
+  }
+
+  getTimeSlots(staffId: string, date: string, courseId?: string): TimeSlot[] {
+    const dateObj = new Date(date + "T00:00:00");
     const dayOfWeek = dateObj.getDay();
+
+    const course = courseId ? this.courses.find((c) => c.id === courseId) : null;
+    const duration = course?.duration ?? 30;
+    const slotsNeeded = Math.ceil(duration / 30);
+
+    // あるスロット時刻から slotsNeeded 分の連続空きがあるか判定
+    const isAvailable = (time: string, blocked: Set<string>): boolean => {
+      const [h, m] = time.split(":").map(Number);
+      let totalMin = h * 60 + m;
+      // 最後のスロットが 19:00 を超えないこと（10:00-19:00 が営業範囲）
+      if (totalMin + (slotsNeeded - 1) * 30 > 19 * 60) return false;
+      for (let i = 0; i < slotsNeeded; i++) {
+        const sh = Math.floor(totalMin / 60);
+        const sm = totalMin % 60;
+        if (blocked.has(`${sh}:${String(sm).padStart(2, "0")}`)) return false;
+        totalMin += 30;
+      }
+      return true;
+    };
+
+    // デフォルトスロット一覧（10:00〜19:00 の30分刻み）
+    const defaultSlotTimes: string[] = [];
+    for (let h = 10; h <= 19; h++) {
+      for (const m of [0, 30]) {
+        if (h === 19 && m === 30) continue;
+        defaultSlotTimes.push(`${h}:${String(m).padStart(2, "0")}`);
+      }
+    }
+
+    if (staffId === "__shop__") {
+      const tableCount = parseInt(this.settings.table_count || "0", 10);
+
+      if (tableCount > 0) {
+        // 卓数モード: 同時間帯の重複予約数 < tableCount なら available
+        return defaultSlotTimes.map((time) => {
+          const [h, m] = time.split(":").map(Number);
+          const startMin = h * 60 + m;
+          // コース終了時間が営業終了（19:00）を超えないこと
+          if (startMin + duration > 19 * 60) return { time, available: false };
+
+          // 指名なし予約のうち、この時間帯と重複する予約数をカウント
+          const count = this.reservations.filter((r) => {
+            if (r.status === "cancelled") return false;
+            if (r.date !== date) return false;
+            if (r.staffId !== "__shop__") return false;
+            const rCourse = this.courses.find((c) => c.id === r.courseId);
+            const rDuration = rCourse?.duration ?? 30;
+            const [rh, rm] = r.time.split(":").map(Number);
+            const rStartMin = rh * 60 + rm;
+            const rEndMin = rStartMin + rDuration;
+            const slotEndMin = startMin + duration;
+            return rStartMin < slotEndMin && rEndMin > startMin;
+          }).length;
+
+          return { time, available: count < tableCount };
+        });
+      }
+
+      // tableCount 未設定: コースに対応できるスタッフのいずれかが duration 分空いている時間のみ available
+      const candidateIds = course?.staffIds?.length
+        ? course.staffIds
+        : this.staff.map((s) => s.id);
+
+      const candidateBlocked = candidateIds.map((sid) =>
+        this.getBlockedSlots(sid, date)
+      );
+
+      return defaultSlotTimes.map((time) => ({
+        time,
+        available: candidateBlocked.some((blocked) =>
+          isAvailable(time, blocked)
+        ),
+      }));
+    }
+
+    // 指名あり: カスタムスロットがあればそれを使う
     const customSlots = this.slots.filter(
       (s) => s.staffId === staffId && s.dayOfWeek === dayOfWeek
     );
-    const bookedTimes = this.reservations
-      .filter(
-        (r) =>
-          r.date === date && r.staffId === staffId && r.status !== "cancelled"
-      )
-      .map((r) => r.time);
+    const blocked = this.getBlockedSlots(staffId, date);
 
     if (customSlots.length > 0) {
       return customSlots
         .map((s) => ({
           time: s.time,
-          available: s.available && !bookedTimes.includes(s.time),
+          available: s.available && isAvailable(s.time, blocked),
         }))
         .sort((a, b) => a.time.localeCompare(b.time));
     }
 
-    const slots: TimeSlot[] = [];
-    for (let h = 10; h <= 19; h++) {
-      for (const m of ["00", "30"]) {
-        if (h === 19 && m === "30") continue;
-        const time = `${h}:${m}`;
-        slots.push({ time, available: !bookedTimes.includes(time) });
-      }
-    }
-    return slots;
+    return defaultSlotTimes.map((time) => ({
+      time,
+      available: isAvailable(time, blocked),
+    }));
   }
 
   getStaffSlots(staffId: string): SlotEntry[] {
     return this.slots.filter((s) => s.staffId === staffId);
   }
 
+  /**
+   * スタッフあり設定で指名なし予約時に、対象日時に空きのあるスタッフを1名返す。
+   * コースのdurationを考慮して連続した空きがあるスタッフを選ぶ。
+   * 空きがなければ null を返す。
+   */
   findAvailableStaff(date: string, time: string, courseId?: string): string | null {
-    // courseIdに対応するスタッフを取得
-    let eligibleStaff = this.staff;
-    if (courseId) {
-      const course = this.courses.find((c) => c.id === courseId);
-      if (course) {
-        eligibleStaff = this.staff.filter((s) => course.staffIds.includes(s.id));
-      }
-    }
+    const course = courseId ? this.courses.find((c) => c.id === courseId) : null;
+    const duration = course?.duration ?? 30;
+    const slotsNeeded = Math.ceil(duration / 30);
 
-    // その時間に予約がないスタッフを探す
-    for (const staff of eligibleStaff) {
-      const slots = this.getTimeSlots(staff.id, date);
-      const slot = slots.find((s) => s.time === time);
-      if (slot && slot.available) {
-        return staff.id;
+    const [h, m] = time.split(":").map(Number);
+    const startMin = h * 60 + m;
+
+    const candidateIds = course?.staffIds?.length
+      ? course.staffIds
+      : this.staff.map((s) => s.id);
+
+    for (const sid of candidateIds) {
+      const blocked = this.getBlockedSlots(sid, date);
+      let available = true;
+      let totalMin = startMin;
+      for (let i = 0; i < slotsNeeded; i++) {
+        const sh = Math.floor(totalMin / 60);
+        const sm = totalMin % 60;
+        if (blocked.has(`${sh}:${String(sm).padStart(2, "0")}`)) {
+          available = false;
+          break;
+        }
+        totalMin += 30;
       }
+      if (available) return sid;
     }
     return null;
   }
