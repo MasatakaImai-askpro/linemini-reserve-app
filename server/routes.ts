@@ -412,8 +412,17 @@ export async function registerRoutes(
   });
 
   // 設定
-  app.get("/api/shops/:shopId/settings", (req, res) => {
+  app.get("/api/shops/:shopId/settings", async (req, res) => {
     const shopId = parseInt(req.params.shopId);
+    // DBからtable_count/max_party_size/staff_selection_enabledを取得してin-memoryに反映
+    const shop = await storage.getShopById(shopId);
+    if (shop) {
+      const store = bookingManager.getOrCreateStore(shopId);
+      if (shop.tableCount != null) store.settings.table_count = String(shop.tableCount);
+      if (shop.maxPartySize != null) store.settings.max_party_size = String(shop.maxPartySize);
+      store.settings.staff_selection_enabled = shop.staffSelectionEnabled ? "true" : "false";
+      return res.json(store.settings);
+    }
     const store = bookingManager.getStore(shopId);
     if (!store) {
       return res.json({
@@ -431,10 +440,18 @@ export async function registerRoutes(
     res.json(store.settings);
   });
 
-  app.put("/api/shops/:shopId/settings", (req, res) => {
+  app.put("/api/shops/:shopId/settings", async (req, res) => {
     const shopId = parseInt(req.params.shopId);
     const store = bookingManager.getOrCreateStore(shopId);
     store.settings = { ...store.settings, ...req.body };
+    // DBにも永続化
+    const dbUpdate: Record<string, unknown> = {};
+    if (req.body.table_count !== undefined) dbUpdate.tableCount = parseInt(req.body.table_count) || null;
+    if (req.body.max_party_size !== undefined) dbUpdate.maxPartySize = parseInt(req.body.max_party_size) || null;
+    if (req.body.staff_selection_enabled !== undefined) dbUpdate.staffSelectionEnabled = req.body.staff_selection_enabled === "true";
+    if (Object.keys(dbUpdate).length > 0) {
+      await storage.updateShop(shopId, dbUpdate as any).catch(() => {});
+    }
     res.json(store.settings);
   });
 

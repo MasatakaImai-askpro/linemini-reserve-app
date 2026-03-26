@@ -101,6 +101,9 @@ export const shops = pgTable("shops", {
   likeCount:             integer("like_count").notNull().default(0),
   stripeConnectId:       text("stripe_connect_id"),
   stripeConnectStatus:   text("stripe_connect_status").default("none"),
+  tableCount:            integer("table_count"),
+  maxPartySize:          integer("max_party_size"),
+  staffSelectionEnabled: boolean("staff_selection_enabled").notNull().default(false),
   updatedAt:             timestamp("updated_at").notNull().defaultNow(),
   createdAt:             timestamp("created_at").notNull().defaultNow(),
 });
