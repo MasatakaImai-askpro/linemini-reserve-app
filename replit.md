@@ -6,7 +6,8 @@ A regional portal site for western Kanagawa prefecture (大和、小田原周辺
 ## Architecture
 - **Frontend**: React + Vite + TailwindCSS + shadcn/ui
 - **Backend**: Express.js
-- **Database**: PostgreSQL with Drizzle ORM (shops/coupons), In-memory store (booking system)
+- **Database**: PostgreSQL with Drizzle ORM (shops/coupons), In-memory store (booking system, local dev only)
+- **Vercel Serverless**: `api/index.ts` - Raw SQL (neon) for all endpoints including booking. booking_settings table stores table_count/max_party_size/staff_selection_enabled persistently
 - **Routing**: wouter
 - **LINE Mini App Frame**: `LineAppFrame` component wraps all pages, providing phone mockup on desktop (375x812), LINE-style header with contextual navigation, status bar, and bottom bar
 

@@ -64,7 +64,7 @@ export const categories = pgTable("categories", {
 // サブカテゴリーマスタ
 // ─────────────────────────────
 export const subCategories = pgTable("sub_categories", {
-  id:          integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id:          serial("id").primaryKey(),
   category_id: integer("category_id").notNull(),
   slug:        text("slug").notNull().unique(),
   name:        text("name").notNull(),
@@ -77,7 +77,7 @@ export const subCategories = pgTable("sub_categories", {
 // 店舗
 // ─────────────────────────────
 export const shops = pgTable("shops", {
-  id:                    integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id:                    serial("id").primaryKey(),
   slug:                  text("slug").notNull().unique(),
   name:                  text("name").notNull(),
   description:           text("description").notNull(),
@@ -124,7 +124,7 @@ export const storeOwners = pgTable("store_owners", {
 // コース・メニュー
 // ─────────────────────────────
 export const storeServices = pgTable("store_services", {
-  id:                 integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id:                 serial("id").primaryKey(),
   shopId:             integer("shop_id").notNull(),
   name:               text("name").notNull(),
   description:        text("description"),
@@ -155,7 +155,7 @@ export const storeStaff = pgTable("store_staff", {
 // 予約
 // ─────────────────────────────
 export const reservations = pgTable("reservations", {
-  id:            integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id:            serial("id").primaryKey(),
   shopId:        integer("shop_id").notNull(),
   serviceId:     integer("service_id"),
   staffId:       integer("staff_id"),
@@ -173,7 +173,7 @@ export const reservations = pgTable("reservations", {
 // クーポン
 // ─────────────────────────────
 export const coupons = pgTable("coupons", {
-  id:                   integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id:                   serial("id").primaryKey(),
   shopId:               integer("shop_id").notNull(),
   title:                text("title").notNull(),
   description:          text("description"),
@@ -194,7 +194,7 @@ export const coupons = pgTable("coupons", {
 // スロット（スタッフごとの空き枠）
 // ─────────────────────────────
 export const storeSlots = pgTable("store_slots", {
-  id:          integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id:          serial("id").primaryKey(),
   shopId:      integer("shop_id").notNull(),
   staffId:     integer("staff_id").notNull(),
   dayOfWeek:   integer("day_of_week").notNull(),
@@ -234,7 +234,7 @@ export const staffCategories = pgTable("staff_categories", {
 // 決済（将来追加）
 // ─────────────────────────────
 export const orders = pgTable("orders", {
-  id:              integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id:              serial("id").primaryKey(),
   shopId:          integer("shop_id").notNull(),
   reservationId:   integer("reservation_id").unique(),
   stripePaymentId: text("stripe_payment_id"),
