@@ -86,9 +86,6 @@ const shops = pgTable("shops", {
   likeCount: integer("like_count").notNull().default(0),
   stripeConnectId: text("stripe_connect_id"),
   stripeConnectStatus: text("stripe_connect_status").default("none"),
-  tableCount: integer("table_count"),
-  maxPartySize: integer("max_party_size"),
-  staffSelectionEnabled: boolean("staff_selection_enabled").notNull().default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -644,54 +641,33 @@ class BookingStoreManager {
 
 const bookingMgr = new BookingStoreManager();
 
-// 設定（DBから読み取り、DB永続化）
-app.get("/api/shops/:shopId/settings", async (req, res) => {
+// 設定（In-Memory store、DB非同期）
+app.get("/api/shops/:shopId/settings", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
-  try {
-    const [shop] = await db.select().from(shops).where(eq(shops.id, shopId));
-    const store = bookingMgr.getOrCreateStore(shopId);
-    if (shop) {
-      if (shop.tableCount != null) store.settings.table_count = String(shop.tableCount);
-      if (shop.maxPartySize != null) store.settings.max_party_size = String(shop.maxPartySize);
-      store.settings.staff_selection_enabled = shop.staffSelectionEnabled ? "true" : "false";
-    }
-    res.json(store.settings);
-  } catch {
-    const store = bookingMgr.getOrCreateStore(shopId);
-    res.json(store.settings);
-  }
+  const store = bookingMgr.getOrCreateStore(shopId);
+  res.json(store.settings);
 });
 
-app.put("/api/shops/:shopId/settings", async (req, res) => {
+app.put("/api/shops/:shopId/settings", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getOrCreateStore(shopId);
   store.settings = { ...store.settings, ...req.body };
-  // DBに永続化
-  try {
-    const dbUpdate: Record<string, unknown> = {};
-    if (req.body.table_count !== undefined) dbUpdate.tableCount = parseInt(req.body.table_count) || null;
-    if (req.body.max_party_size !== undefined) dbUpdate.maxPartySize = parseInt(req.body.max_party_size) || null;
-    if (req.body.staff_selection_enabled !== undefined) dbUpdate.staffSelectionEnabled = req.body.staff_selection_enabled === "true";
-    if (Object.keys(dbUpdate).length > 0) {
-      await db.update(shops).set({ ...dbUpdate, updatedAt: new Date() }).where(eq(shops.id, shopId));
-    }
-  } catch (e) { console.error("settings DB sync error:", e); }
   res.json(store.settings);
 });
 
 // スタッフ
-app.get("/api/shops/:shopId/staff", (req, res) => {
+app.get("/api/shops/:shopId/staff", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getStore(shopId);
   if (!store) return res.json([]);
-  const result = store.staff.map(s => ({
+  const result = store.staff.map((s: Staff) => ({
     ...s,
-    courseIds: store.courses.filter(c => c.staffIds.includes(s.id)).map(c => c.id),
+    courseIds: store.courses.filter((c: Course) => c.staffIds.includes(s.id)).map((c: Course) => c.id),
   }));
   res.json(result);
 });
 
-app.post("/api/shops/:shopId/staff", (req, res) => {
+app.post("/api/shops/:shopId/staff", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getOrCreateStore(shopId);
   const { courseIds, ...rest } = req.body;
@@ -706,7 +682,7 @@ app.post("/api/shops/:shopId/staff", (req, res) => {
   res.status(201).json(newStaff);
 });
 
-app.put("/api/shops/:shopId/staff", (req, res) => {
+app.put("/api/shops/:shopId/staff", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getStore(shopId);
   if (!store) return res.status(404).json({ message: "Shop not found" });
@@ -723,7 +699,7 @@ app.put("/api/shops/:shopId/staff", (req, res) => {
   res.json(store.staff[idx]);
 });
 
-app.delete("/api/shops/:shopId/staff", (req, res) => {
+app.delete("/api/shops/:shopId/staff", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getStore(shopId);
   if (!store) return res.status(404).json({ message: "Shop not found" });
@@ -734,14 +710,14 @@ app.delete("/api/shops/:shopId/staff", (req, res) => {
 });
 
 // コース
-app.get("/api/shops/:shopId/courses", (req, res) => {
+app.get("/api/shops/:shopId/courses", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getStore(shopId);
   if (!store) return res.json([]);
   res.json(store.courses);
 });
 
-app.post("/api/shops/:shopId/courses", (req, res) => {
+app.post("/api/shops/:shopId/courses", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getOrCreateStore(shopId);
   const { staffIds, ...rest } = req.body;
@@ -756,7 +732,7 @@ app.post("/api/shops/:shopId/courses", (req, res) => {
   res.status(201).json(newCourse);
 });
 
-app.put("/api/shops/:shopId/courses", (req, res) => {
+app.put("/api/shops/:shopId/courses", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getStore(shopId);
   if (!store) return res.status(404).json({ message: "Shop not found" });
@@ -768,7 +744,7 @@ app.put("/api/shops/:shopId/courses", (req, res) => {
   res.json(store.courses[idx]);
 });
 
-app.delete("/api/shops/:shopId/courses", (req, res) => {
+app.delete("/api/shops/:shopId/courses", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getStore(shopId);
   if (!store) return res.status(404).json({ message: "Shop not found" });
@@ -779,7 +755,7 @@ app.delete("/api/shops/:shopId/courses", (req, res) => {
 });
 
 // スロット
-app.get("/api/shops/:shopId/slots", (req, res) => {
+app.get("/api/shops/:shopId/slots", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getOrCreateStore(shopId);
   const { staffId, date, courseId } = req.query as { staffId?: string; date?: string; courseId?: string };
@@ -788,7 +764,7 @@ app.get("/api/shops/:shopId/slots", (req, res) => {
   res.json(store.slots);
 });
 
-app.put("/api/shops/:shopId/slots", (req, res) => {
+app.put("/api/shops/:shopId/slots", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getOrCreateStore(shopId);
   const { staffId, dayOfWeek, time, available } = req.body;
@@ -798,7 +774,7 @@ app.put("/api/shops/:shopId/slots", (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/shops/:shopId/slots", (req, res) => {
+app.post("/api/shops/:shopId/slots", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getOrCreateStore(shopId);
   const { staffId, dayOfWeek, times, available } = req.body;
@@ -811,14 +787,14 @@ app.post("/api/shops/:shopId/slots", (req, res) => {
 });
 
 // 予約
-app.get("/api/shops/:shopId/reservations", (req, res) => {
+app.get("/api/shops/:shopId/reservations", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getStore(shopId);
   if (!store) return res.json([]);
   res.json(store.reservations);
 });
 
-app.post("/api/shops/:shopId/reservations", (req, res) => {
+app.post("/api/shops/:shopId/reservations", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getOrCreateStore(shopId);
   let { staffId, date, time, courseId, ...rest } = req.body;
@@ -836,7 +812,7 @@ app.post("/api/shops/:shopId/reservations", (req, res) => {
   res.status(201).json(reservation);
 });
 
-app.put("/api/shops/:shopId/reservations", (req, res) => {
+app.put("/api/shops/:shopId/reservations", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getStore(shopId);
   if (!store) return res.status(404).json({ message: "Shop not found" });
@@ -847,7 +823,7 @@ app.put("/api/shops/:shopId/reservations", (req, res) => {
   res.json(store.reservations[idx]);
 });
 
-app.delete("/api/shops/:shopId/reservations", (req, res) => {
+app.delete("/api/shops/:shopId/reservations", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getStore(shopId);
   if (!store) return res.status(404).json({ message: "Shop not found" });
@@ -857,7 +833,7 @@ app.delete("/api/shops/:shopId/reservations", (req, res) => {
 });
 
 // キャンセル
-app.get("/api/shops/:shopId/cancel/:token", (req, res) => {
+app.get("/api/shops/:shopId/cancel/:token", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getStore(shopId);
   if (!store) return res.status(404).json({ message: "Shop not found" });
@@ -868,7 +844,7 @@ app.get("/api/shops/:shopId/cancel/:token", (req, res) => {
   res.json({ ...r, courseName: course?.name, staffName: staff?.name });
 });
 
-app.post("/api/shops/:shopId/cancel/:token", (req, res) => {
+app.post("/api/shops/:shopId/cancel/:token", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getStore(shopId);
   if (!store) return res.status(404).json({ message: "Shop not found" });
@@ -881,14 +857,14 @@ app.post("/api/shops/:shopId/cancel/:token", (req, res) => {
 });
 
 // お問い合わせ
-app.get("/api/shops/:shopId/inquiries", (req, res) => {
+app.get("/api/shops/:shopId/inquiries", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getStore(shopId);
   if (!store) return res.json([]);
   res.json(store.inquiries);
 });
 
-app.post("/api/shops/:shopId/inquiries", (req, res) => {
+app.post("/api/shops/:shopId/inquiries", (req: Request, res: Response) => {
   const shopId = parseInt(req.params.shopId);
   const store = bookingMgr.getOrCreateStore(shopId);
   const inquiry: InquiryEntry = { id: store.genId(), ...req.body, createdAt: new Date().toISOString() };
