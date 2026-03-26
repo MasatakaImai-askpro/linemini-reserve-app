@@ -996,7 +996,74 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
     }
   });
 
-  // Stripeアカウント設定（内部用）
+
+    // Stripe Connect: オンボーディング開始（アカウント作成 + AccountLink）
+    app.post("/api/stripe/connect/onboard/:shopId", async (req, res) => {
+      try {
+        const shopId = req.params.shopId;
+        const rows = await sql`SELECT id, name, stripe_connect_id FROM shops WHERE id = ${shopId}`;
+        if (!rows.length) return res.status(404).json({ error: "Shop not found" });
+        const shop = rows[0];
+
+        const stripe = await getStripeClient();
+        let accountId = shop.stripe_connect_id;
+
+        if (!accountId) {
+          const account = await stripe.accounts.create({
+            type: "express",
+            country: "JP",
+            capabilities: {
+              card_payments: { requested: true },
+              transfers: { requested: true },
+            },
+          });
+          accountId = account.id;
+          await sql`UPDATE shops SET stripe_connect_id = ${accountId}, stripe_connect_status = 'pending' WHERE id = ${shopId}`;
+        } else {
+          await stripe.accounts.update(accountId, {
+            capabilities: {
+              card_payments: { requested: true },
+              transfers: { requested: true },
+            },
+          });
+        }
+
+        const domain = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : (process.env.APP_URL || "https://linemini-reserve-app.vercel.app");
+
+        const link = await stripe.accountLinks.create({
+          account: accountId,
+          refresh_url: `${domain}/admin`,
+          return_url: `${domain}/admin`,
+          type: "account_onboarding",
+        });
+
+        res.json({ url: link.url });
+      } catch (e: any) {
+        console.error("Onboard error:", e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // Stripe Connect: ダッシュボード LoginLink
+    app.post("/api/stripe/connect/dashboard/:shopId", async (req, res) => {
+      try {
+        const shopId = req.params.shopId;
+        const rows = await sql`SELECT id, stripe_connect_id FROM shops WHERE id = ${shopId}`;
+        if (!rows.length || !rows[0].stripe_connect_id) {
+          return res.status(400).json({ error: "Stripe未連携です" });
+        }
+        const stripe = await getStripeClient();
+        const loginLink = await stripe.accounts.createLoginLink(rows[0].stripe_connect_id);
+        res.json({ url: loginLink.url });
+      } catch (e: any) {
+        console.error("Dashboard error:", e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+      // Stripeアカウント設定（内部用）
   app.post("/api/fix-stripe-accounts", async (_req, res) => {
     try {
       await sql`UPDATE shops SET stripe_connect_id = acct_1TEsH7DJNIHpMLg5, stripe_connect_status = 'active' WHERE id = 6`;
