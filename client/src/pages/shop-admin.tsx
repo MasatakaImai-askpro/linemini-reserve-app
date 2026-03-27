@@ -523,11 +523,6 @@ export default function ShopAdminPage() {
 
   const { data: shop, isLoading } = useQuery<Shop>({
     queryKey: ["/api/shops", params.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/shops/${params.id}`);
-      if (!res.ok) throw new Error("Shop not found");
-      return res.json();
-    },
   });
 
   const tabs: { id: ShopAdminTab; label: string; icon: typeof Store }[] = [
