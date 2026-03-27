@@ -11,7 +11,7 @@ A regional portal site for western Kanagawa prefecture (大和、小田原周辺
 - **LINE Mini App Frame**: `LineAppFrame` component wraps all pages, providing phone mockup on desktop (375x812), LINE-style header with contextual navigation, status bar, and bottom bar
 
 ## Pages & Routes
-- **Landing Page** (`/`) - 3-button entry: LINE公式アカウント (green→/line), 店舗ミニアプリ (orange→/app), 管理画面 (dark→/admin)
+- **Landing Page** (`/`) - 5-button entry: LINE公式アカウント (green→/line), 店舗ミニアプリ (orange→/app), WEB(PC) (blue→/web), WEB(SP) (violet→/web-sp), 管理画面 (dark→/admin)
 - **LINE Demo** (`/line`) - LINE Official Account talk screen demo with pinned note bar. Back navigates to `/`, opens Mini App at `/app`
 - **Top Page** (`/app`) - Hero banner, SVG area map (14 areas), category grid, coupon carousel, genre sections. Wrapped in LineAppFrame
 - **List Page** (`/app/list`) - Compact horizontal-card layout, area/category filters, keyword search, favorites filter
@@ -20,6 +20,12 @@ A regional portal site for western Kanagawa prefecture (大和、小田原周辺
 - **Cancel Page** (`/app/cancel/:shopId/:token`) - Token-based reservation cancel page (メール送付用、localStorageに依存しない)
 - **Admin Dashboard** (`/admin`) - 管理者用。店舗一覧、表示順序、予約ON/OFF、LINE設定、クーポン管理。予約有効な店舗には「店舗管理画面を開く」リンク付き
 - **Shop Admin Page** (`/admin/shop/:id`) - 各店舗の管理画面。4タブ: コース管理, スタッフ管理, 予約枠管理, 予約一覧。店舗オーナー向け
+
+## Web Mode
+- `/web/*` routes use `WebAppFrame` - standard web header, max-w-6xl desktop layout, no LINE frame
+- `/web-sp/*` routes use `WebSpFrame` - same web header but full-width (mobile web display)
+- `useBasePath()` hook in `client/src/hooks/use-base-path.ts` detects current route prefix (/app, /web, /web-sp) and returns correct base path for all internal navigation links
+- `WebAppFrame`/`WebSpFrame` in `client/src/components/web-app-frame.tsx` - web header with logo, nav links, coupon wallet button
 
 ## LINE Mini App Integration
 - `LineAppFrame` wraps `/app/*` routes in `App.tsx`
