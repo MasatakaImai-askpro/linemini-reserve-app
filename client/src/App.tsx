@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import LineAppFrame from "@/components/line-app-frame";
+import { WebAppFrame } from "@/components/web-app-frame";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import HomePage from "@/pages/home";
@@ -33,6 +34,22 @@ function LineAppRouter() {
     </LineAppFrame>
   );
 }
+
+function WebRouter() {
+  return (
+    <WebAppFrame>
+      <Switch>
+        <Route path="/web" component={HomePage} />
+        <Route path="/web/list" component={ListPage} />
+        <Route path="/web/shop/:id" component={DetailPage} />
+        <Route path="/web/reservation/:id" component={ReservationPage} />
+        <Route path="/web/cancel/:shopId/:token" component={CancelPage} />
+        <Route component={NotFound} />
+      </Switch>
+    </WebAppFrame>
+  );
+}
+
 
 function AdminRoute() {
   const { user, isLoading } = useAuth();
@@ -97,6 +114,8 @@ function App() {
           <Route path="/line" component={LineDemoPage} />
           <Route path="/reservation/:id" component={ReservationPage} />
           <Route path="/cancel/:shopId/:token" component={CancelPage} />
+          <Route path="/web/:rest*" component={WebRouter} />
+          <Route path="/web" component={WebRouter} />
           <Route path="/app/:rest*" component={LineAppRouter} />
           <Route component={LineAppRouter} />
         </Switch>

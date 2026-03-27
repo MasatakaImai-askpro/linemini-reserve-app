@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
+import { useBasePath } from "@/hooks/use-base-path";
 import { Ban, Calendar, Clock, CreditCard, Check, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,6 +12,7 @@ export default function CancelPage() {
   const params = useParams<{ shopId: string; token: string }>();
   const shopId = parseInt(params.shopId || "0");
   const token = params.token || "";
+  const basePath = useBasePath();
 
   const [info, setInfo] = useState<CancelInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +65,7 @@ export default function CancelPage() {
             このキャンセルリンクは無効です。<br />
             予約が既にキャンセルされたか、リンクが正しくない可能性があります。
           </p>
-          <Link href="/app">
+          <Link href={basePath}>
             <Button className="mt-6 w-full" data-testid="button-cancel-back-home">
               トップページへ
             </Button>
@@ -101,7 +103,7 @@ export default function CancelPage() {
             </div>
           </div>
 
-          <Link href="/app">
+          <Link href={basePath}>
             <Button className="mt-6 w-full" data-testid="button-cancel-done-home">
               トップページへ
             </Button>
@@ -165,7 +167,7 @@ export default function CancelPage() {
           >
             {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : "キャンセルする"}
           </Button>
-          <Link href="/app">
+          <Link href={basePath}>
             <Button variant="outline" className="w-full py-5 text-sm" data-testid="button-cancel-back">
               戻る
             </Button>

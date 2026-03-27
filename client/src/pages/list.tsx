@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
+import { useBasePath } from "@/hooks/use-base-path";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +44,7 @@ export default function ListPage() {
   const [keyword, setKeyword] = useState(initialQ);
   const [favOnly, setFavOnly] = useState(params.get("fav") === "1");
   const [, navigate] = useLocation();
+  const basePath = useBasePath();
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
 
   const subcategoryOptions = category !== "all" ? (SUBCATEGORIES[category] ?? []) : [];
@@ -85,9 +87,10 @@ export default function ListPage() {
   }, [area, category, subcategory, subcategoryOptions, keyword, favOnly]);
 
   const hasFilters = area !== "all" || category !== "all" || subcategory !== "all" || keyword !== "" || favOnly;
+  const isWeb = basePath === "/web";
 
   return (
-    <div className="bg-background px-3 py-3">
+    <div className={`bg-background ${isWeb ? "max-w-6xl mx-auto px-6 py-6" : "px-3 py-3"}`}>
       <div className="bg-card rounded-lg border p-2.5 mb-3">
         <div className="flex gap-2 mb-2">
           <Select value={area} onValueChange={setArea}>
@@ -210,45 +213,87 @@ export default function ListPage() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-2.5">
+        <div className={isWeb ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-2.5"}>
           {filteredShops.map((shop) => (
-            <ListShopCard key={shop.id} shop={shop} isFav={isFavorite(shop.id)} onToggleFav={() => toggleFavorite(shop.id)} />
+            <ListShopCard key={shop.id} shop={shop} isFav={isFavorite(shop.id)} onToggleFav={() => toggleFavorite(shop.id)} isWeb={isWeb} />
           ))}
         </div>
       )}
 
-      <footer className="text-center py-4 mt-4">
-        <Link href="/app">
-          <span className="text-xs font-bold text-primary cursor-pointer" data-testid="link-footer-home">
-            神奈川おでかけナビ
-          </span>
-        </Link>
-        <p className="text-[10px] text-muted-foreground mt-1">
-          &copy; 2026 神奈川おでかけナビ
-        </p>
-      </footer>
+      {!isWeb && (
+        <footer className="text-center py-4 mt-4">
+          <Link href={basePath}>
+            <span className="text-xs font-bold text-primary cursor-pointer" data-testid="link-footer-home">
+              神奈川おでかけナビ
+            </span>
+          </Link>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            &copy; 2026 神奈川おでかけナビ
+          </p>
+        </footer>
+      )}
     </div>
   );
 }
 
-function ListShopCard({ shop, isFav, onToggleFav }: { shop: Shop; isFav: boolean; onToggleFav: () => void }) {
+function ListShopCard({ shop, isFav, onToggleFav, isWeb }: { shop: Shop; isFav: boolean; onToggleFav: () => void; isWeb?: boolean }) {
   const recentlyUpdated = isRecentlyUpdated(shop.updatedAt);
+  const basePath = useBasePath();
+
+  if (isWeb) {
+    return (
+      <Link href={`${basePath}/shop/${shop.id}`}>
+        <Card className="overflow-hidden cursor-pointer hover-elevate active-elevate-2 transition-transform h-full flex flex-col" data-testid={`card-list-shop-${shop.id}`}>
+          <div className="relative h-[180px] flex-shrink-0">
+            <img src={shop.imageUrl} alt={shop.name} className="w-full h-full object-cover" loading="lazy" />
+            <button
+              className="absolute top-2 left-2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFav(); }}
+              data-testid={`button-favorite-list-shop-${shop.id}`}
+            >
+              <Heart className={`w-4 h-4 ${isFav ? "fill-red-500 text-red-500" : "text-white"}`} />
+            </button>
+            {recentlyUpdated && (
+              <div className="absolute top-2 right-2">
+                <Badge className="bg-orange-500 border-orange-500 text-white text-xs px-2 py-0.5">
+                  <Bell className="w-3 h-3 mr-0.5" />更新
+                </Badge>
+              </div>
+            )}
+          </div>
+          <div className="flex-1 p-3">
+            <div className="flex items-center gap-1 mb-1.5 flex-wrap">
+              <Badge variant="outline" className="text-xs px-1.5 py-0">{getCategoryName(shop.category)}</Badge>
+              <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                <MapPin className="w-3 h-3 mr-0.5" />{getAreaName(shop.area)}
+              </Badge>
+            </div>
+            <h3 className="font-bold text-sm mb-1 truncate" data-testid={`text-list-shop-name-${shop.id}`}>{shop.name}</h3>
+            <p className="text-xs text-muted-foreground line-clamp-2 mb-2 leading-relaxed">{shop.description}</p>
+            {shop.hours && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+                <Clock className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{shop.hours}</span>
+              </div>
+            )}
+            <span className="text-xs text-primary font-medium flex items-center gap-0.5 mt-auto">
+              詳細を見る <ChevronRight className="w-3 h-3" />
+            </span>
+          </div>
+        </Card>
+      </Link>
+    );
+  }
 
   return (
-    <Link href={`/app/shop/${shop.id}`}>
+    <Link href={`${basePath}/shop/${shop.id}`}>
       <Card
         className="overflow-hidden cursor-pointer hover-elevate active-elevate-2 transition-transform"
         data-testid={`card-list-shop-${shop.id}`}
       >
         <div className="flex">
           <div className="relative w-[110px] flex-shrink-0">
-            <img
-              src={shop.imageUrl}
-              alt={shop.name}
-              className="w-full h-full object-cover"
-              style={{ minHeight: "100px" }}
-              loading="lazy"
-            />
+            <img src={shop.imageUrl} alt={shop.name} className="w-full h-full object-cover" style={{ minHeight: "100px" }} loading="lazy" />
             <button
               className="absolute top-1 left-1 w-7 h-7 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFav(); }}
@@ -259,39 +304,29 @@ function ListShopCard({ shop, isFav, onToggleFav }: { shop: Shop; isFav: boolean
             {recentlyUpdated && (
               <div className="absolute top-1 right-1">
                 <Badge className="bg-orange-500 border-orange-500 text-white text-[10px] px-1 py-0">
-                  <Bell className="w-2.5 h-2.5 mr-0.5" />
-                  更新
+                  <Bell className="w-2.5 h-2.5 mr-0.5" />更新
                 </Badge>
               </div>
             )}
           </div>
           <div className="flex-1 p-2.5 min-w-0">
             <div className="flex items-center gap-1 mb-1 flex-wrap">
-              <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
-                {getCategoryName(shop.category)}
-              </Badge>
+              <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">{getCategoryName(shop.category)}</Badge>
               <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
-                <MapPin className="w-2.5 h-2.5 mr-0.5" />
-                {getAreaName(shop.area)}
+                <MapPin className="w-2.5 h-2.5 mr-0.5" />{getAreaName(shop.area)}
               </Badge>
             </div>
-            <h3 className="font-bold text-xs mb-0.5 truncate" data-testid={`text-list-shop-name-${shop.id}`}>
-              {shop.name}
-            </h3>
-            <p className="text-[10px] text-muted-foreground line-clamp-2 mb-1.5 leading-tight">
-              {shop.description}
-            </p>
-            <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-1">
-              {shop.hours && (
+            <h3 className="font-bold text-xs mb-0.5 truncate" data-testid={`text-list-shop-name-${shop.id}`}>{shop.name}</h3>
+            <p className="text-[10px] text-muted-foreground line-clamp-2 mb-1.5 leading-tight">{shop.description}</p>
+            {shop.hours && (
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-1">
                 <span className="flex items-center gap-0.5 truncate">
-                  <Clock className="w-2.5 h-2.5 flex-shrink-0" />
-                  {shop.hours}
+                  <Clock className="w-2.5 h-2.5 flex-shrink-0" />{shop.hours}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
             <span className="text-[10px] text-primary font-medium flex items-center gap-0.5">
-              詳細を見る
-              <ChevronRight className="w-3 h-3" />
+              詳細を見る <ChevronRight className="w-3 h-3" />
             </span>
           </div>
         </div>

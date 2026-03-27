@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import { SiLine } from "react-icons/si";
-import { Store, CalendarCheck, ChevronRight } from "lucide-react";
+import { Store, CalendarCheck, ChevronRight, Globe } from "lucide-react";
 
 export default function LandingPage() {
   const [, navigate] = useLocation();
@@ -45,6 +45,21 @@ export default function LandingPage() {
             <div className="text-left flex-1 min-w-0">
               <p className="text-base font-bold text-white">店舗ミニアプリ</p>
               <p className="text-xs text-white/80">お店検索・クーポン・予約</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-white/60 flex-shrink-0" />
+          </button>
+
+          <button
+            onClick={() => navigate("/web")}
+            className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 active:scale-[0.98] rounded-xl p-5 flex items-center gap-4 transition-all shadow-md"
+            data-testid="button-landing-web"
+          >
+            <div className="w-12 h-12 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+              <Globe className="w-7 h-7 text-white" />
+            </div>
+            <div className="text-left flex-1 min-w-0">
+              <p className="text-base font-bold text-white">WEB版サイト</p>
+              <p className="text-xs text-white/80">PC・スマホ対応レスポンシブ表示</p>
             </div>
             <ChevronRight className="w-5 h-5 text-white/60 flex-shrink-0" />
           </button>

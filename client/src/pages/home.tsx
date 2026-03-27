@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
+import { useBasePath } from "@/hooks/use-base-path";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,9 +45,9 @@ const categoryIcons: Record<string, any> = {
   medical: HeartPulse,
 };
 
-function HeroSection() {
+function HeroSection({ isWeb }: { isWeb?: boolean }) {
   return (
-    <div className="relative w-full h-[160px] overflow-hidden">
+    <div className={`relative w-full overflow-hidden ${isWeb ? "h-[260px]" : "h-[160px]"}`}>
       <img
         src="/images/hero-kanagawa.png"
         alt="Kanagawa"
@@ -54,7 +55,7 @@ function HeroSection() {
         style={{ transform: "scaleX(-1)" }}
       />
       <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/60" />
-      <div className="relative z-10 flex flex-col items-center justify-center h-full px-3 text-center">
+      <div className="relative z-10 flex flex-col items-center justify-center h-full px-4 text-center">
         <Badge
           variant="secondary"
           className="mb-2 bg-white/20 text-white border-white/30 backdrop-blur-sm text-[10px] px-2 py-0.5"
@@ -64,16 +65,16 @@ function HeroSection() {
           神奈川県全域・静岡県東部
         </Badge>
         <h1
-          className="text-lg font-bold text-white mb-1 tracking-tight"
+          className={`font-bold text-white mb-1 tracking-tight ${isWeb ? "text-3xl" : "text-lg"}`}
           data-testid="text-hero-title"
         >
           神奈川おでかけナビ
         </h1>
         <p
-          className="text-white/80 text-[10px] leading-relaxed"
+          className={`text-white/80 leading-relaxed ${isWeb ? "text-sm mt-1" : "text-[10px]"}`}
           data-testid="text-hero-description"
         >
-          大和・小田原エリアのお店をまとめてご紹介
+          神奈川県・静岡県東部エリアのお店をまとめてご紹介
         </p>
       </div>
     </div>
@@ -82,8 +83,10 @@ function HeroSection() {
 
 function SearchBar({
   onSearch,
+  isWeb,
 }: {
   onSearch: (area: string, category: string, keyword: string) => void;
+  isWeb?: boolean;
 }) {
   const [area, setArea] = useState("all");
   const [category, setCategory] = useState("all");
@@ -93,44 +96,72 @@ function SearchBar({
     onSearch(area, category, keyword);
   };
 
+  if (isWeb) {
+    return (
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="bg-card border border-card-border rounded-xl p-4 -mt-8 relative z-20 shadow-lg">
+          <div className="flex flex-wrap gap-3 items-end">
+            <Select value={area} onValueChange={setArea}>
+              <SelectTrigger className="w-[160px]" data-testid="select-area">
+                <MapPin className="w-4 h-4 mr-2 text-muted-foreground flex-shrink-0" />
+                <SelectValue placeholder="エリア" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">すべてのエリア</SelectItem>
+                {AREAS.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="w-[140px]" data-testid="select-category">
+                <SelectValue placeholder="業種" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">すべての業種</SelectItem>
+                {CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <div className="flex flex-1 min-w-[200px] gap-2">
+              <Input
+                placeholder="キーワードで検索..."
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                className="flex-1"
+                data-testid="input-keyword"
+              />
+              <Button onClick={handleSearch} data-testid="button-search">
+                <Search className="w-4 h-4 mr-1" />
+                検索
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-card border border-card-border rounded-md p-2.5 -mt-6 relative z-20 mx-3 max-w-4xl">
+    <div className="bg-card border border-card-border rounded-md p-2.5 -mt-6 relative z-20 mx-3">
       <div className="flex flex-col gap-2">
         <Select value={area} onValueChange={setArea}>
-          <SelectTrigger
-            className="md:w-[180px]"
-            data-testid="select-area"
-          >
+          <SelectTrigger data-testid="select-area">
             <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
             <SelectValue placeholder="エリアを選択" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">すべてのエリア</SelectItem>
-            {AREAS.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
+            {AREAS.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
           </SelectContent>
         </Select>
-
         <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger
-            className="md:w-[180px]"
-            data-testid="select-category"
-          >
+          <SelectTrigger data-testid="select-category">
             <SelectValue placeholder="業種を選択" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">すべての業種</SelectItem>
-            {CATEGORIES.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
+            {CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
-
         <div className="flex flex-1 gap-2">
           <Input
             placeholder="キーワードで検索..."
@@ -150,16 +181,18 @@ function SearchBar({
   );
 }
 
-function AutoScrollRow({ shops, title, categoryId, icon }: { shops: Shop[]; title: string; categoryId: string; icon?: any }) {
+function AutoScrollRow({ shops, title, categoryId, icon, isWeb }: { shops: Shop[]; title: string; categoryId: string; icon?: any; isWeb?: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
   const animationRef = useRef<number>();
   const scrollSpeedRef = useRef(0.5);
+  const basePath = useBasePath();
+  const [, navigate] = useLocation();
 
   useEffect(() => {
+    if (isWeb) return;
     const container = scrollRef.current;
     if (!container || shops.length <= 2) return;
-
     const animate = () => {
       if (!isPaused && container) {
         container.scrollLeft += scrollSpeedRef.current;
@@ -169,97 +202,98 @@ function AutoScrollRow({ shops, title, categoryId, icon }: { shops: Shop[]; titl
       }
       animationRef.current = requestAnimationFrame(animate);
     };
-
     animationRef.current = requestAnimationFrame(animate);
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    };
-  }, [isPaused, shops.length]);
+    return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
+  }, [isPaused, shops.length, isWeb]);
 
   const scroll = (direction: "left" | "right") => {
     const container = scrollRef.current;
     if (!container) return;
-    const scrollAmount = 300;
-    container.scrollBy({
-      left: direction === "left" ? -scrollAmount : scrollAmount,
-      behavior: "smooth",
-    });
+    container.scrollBy({ left: direction === "left" ? -300 : 300, behavior: "smooth" });
   };
 
   const IconComponent = icon || categoryIcons[categoryId] || MapPinned;
-
   if (shops.length === 0) return null;
 
   return (
-    <section className="mb-4" data-testid={`section-category-${categoryId}`}>
-      <div className="flex items-center justify-between mb-2 px-3">
+    <section className={`mb-6 ${isWeb ? "" : "mb-4"}`} data-testid={`section-category-${categoryId}`}>
+      <div className={`flex items-center justify-between mb-2 ${isWeb ? "px-4" : "px-3"}`}>
         <div className="flex items-center gap-1.5">
           <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center">
             <IconComponent className="w-3 h-3 text-primary" />
           </div>
-          <h2 className="text-sm font-bold" data-testid={`text-category-title-${categoryId}`}>
+          <h2 className={`font-bold ${isWeb ? "text-base" : "text-sm"}`} data-testid={`text-category-title-${categoryId}`}>
             {title}
           </h2>
           <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
             {shops.length}件
           </Badge>
         </div>
-        <div className="flex items-center gap-0.5">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-6 w-6"
-            onClick={() => scroll("left")}
-            data-testid={`button-scroll-left-${categoryId}`}
-          >
-            <ChevronLeft className="w-3 h-3" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-6 w-6"
-            onClick={() => scroll("right")}
-            data-testid={`button-scroll-right-${categoryId}`}
-          >
-            <ChevronRight className="w-3 h-3" />
-          </Button>
+        <div className="flex items-center gap-1">
+          {!isWeb && (
+            <>
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => scroll("left")} data-testid={`button-scroll-left-${categoryId}`}>
+                <ChevronLeft className="w-3 h-3" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => scroll("right")} data-testid={`button-scroll-right-${categoryId}`}>
+                <ChevronRight className="w-3 h-3" />
+              </Button>
+            </>
+          )}
+          {isWeb && (
+            <button
+              onClick={() => navigate(`${basePath}/list?category=${categoryId}`)}
+              className="text-xs text-primary flex items-center gap-0.5 hover:underline"
+            >
+              すべて見る <ChevronRight className="w-3 h-3" />
+            </button>
+          )}
         </div>
       </div>
 
-      <div
-        ref={scrollRef}
-        className="flex gap-2.5 overflow-x-auto scrollbar-hide px-3 pb-1"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
-        onTouchStart={() => setIsPaused(true)}
-        onTouchEnd={() => setIsPaused(false)}
-      >
-        {shops.map((shop) => (
-          <ShopCard key={shop.id} shop={shop} />
-        ))}
-      </div>
+      {isWeb ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 px-4">
+          {shops.map((shop) => (
+            <ShopCard key={shop.id} shop={shop} isWeb />
+          ))}
+        </div>
+      ) : (
+        <div
+          ref={scrollRef}
+          className="flex gap-2.5 overflow-x-auto scrollbar-hide px-3 pb-1"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
+          onTouchStart={() => setIsPaused(true)}
+          onTouchEnd={() => setIsPaused(false)}
+        >
+          {shops.map((shop) => (
+            <ShopCard key={shop.id} shop={shop} />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
 
-function ShopCard({ shop }: { shop: Shop }) {
+function ShopCard({ shop, isWeb }: { shop: Shop; isWeb?: boolean }) {
   const [, navigate] = useLocation();
+  const basePath = useBasePath();
   const { isFavorite, toggleFavorite } = useFavorites();
   const recentlyUpdated = isRecentlyUpdated(shop.updatedAt);
   const favorited = isFavorite(shop.id);
 
   return (
     <Card
-      className="flex-shrink-0 w-[160px] overflow-visible cursor-pointer hover-elevate active-elevate-2 transition-transform"
-      onClick={() => navigate(`/app/shop/${shop.id}`)}
+      className={`overflow-visible cursor-pointer hover-elevate active-elevate-2 transition-transform ${isWeb ? "w-full" : "flex-shrink-0 w-[160px]"}`}
+      onClick={() => navigate(`${basePath}/shop/${shop.id}`)}
       data-testid={`card-shop-${shop.id}`}
     >
       <div className="relative">
         <img
           src={shop.imageUrl}
           alt={shop.name}
-          className="w-full h-[100px] object-cover rounded-t-md"
+          className={`w-full object-cover rounded-t-md ${isWeb ? "h-[150px]" : "h-[100px]"}`}
           loading="lazy"
         />
         <button
@@ -286,7 +320,7 @@ function ShopCard({ shop }: { shop: Shop }) {
             {getAreaName(shop.area)}
           </span>
         </div>
-        <h3 className="font-semibold text-xs line-clamp-1" data-testid={`text-shop-name-${shop.id}`}>
+        <h3 className={`font-semibold line-clamp-1 ${isWeb ? "text-sm" : "text-xs"}`} data-testid={`text-shop-name-${shop.id}`}>
           {shop.name}
         </h3>
         <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">
@@ -314,32 +348,33 @@ function AreaMapSection() {
   );
 }
 
-function CategoryGrid() {
+function CategoryGrid({ isWeb }: { isWeb?: boolean }) {
   const [, navigate] = useLocation();
+  const basePath = useBasePath();
 
   return (
-    <section className="mb-4 px-3">
-      <div className="flex items-center gap-1.5 mb-2">
+    <section className={`mb-4 ${isWeb ? "px-4 py-6" : "px-3"}`}>
+      <div className="flex items-center gap-1.5 mb-3">
         <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center">
           <Search className="w-3 h-3 text-primary" />
         </div>
-        <h2 className="text-sm font-bold" data-testid="text-category-grid-title">ジャンルから探す</h2>
+        <h2 className={`font-bold ${isWeb ? "text-base" : "text-sm"}`} data-testid="text-category-grid-title">ジャンルから探す</h2>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className={`grid gap-2 ${isWeb ? "grid-cols-3 sm:grid-cols-6" : "grid-cols-3"}`}>
         {CATEGORIES.map((cat) => {
           const Icon = categoryIcons[cat.id] || MapPinned;
           return (
             <Card
               key={cat.id}
-              className="p-2.5 flex flex-col items-center gap-1 cursor-pointer hover-elevate active-elevate-2 overflow-visible"
-              onClick={() => navigate(`/app/list?category=${cat.id}`)}
+              className={`flex flex-col items-center gap-1.5 cursor-pointer hover-elevate active-elevate-2 overflow-visible ${isWeb ? "p-4" : "p-2.5"}`}
+              onClick={() => navigate(`${basePath}/list?category=${cat.id}`)}
               data-testid={`card-category-${cat.id}`}
             >
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <Icon className="w-4 h-4 text-primary" />
+              <div className={`rounded-full bg-primary/10 flex items-center justify-center ${isWeb ? "w-12 h-12" : "w-8 h-8"}`}>
+                <Icon className={`text-primary ${isWeb ? "w-6 h-6" : "w-4 h-4"}`} />
               </div>
-              <span className="text-[10px] font-medium text-center">{cat.name}</span>
+              <span className={`font-medium text-center ${isWeb ? "text-sm" : "text-[10px]"}`}>{cat.name}</span>
             </Card>
           );
         })}
@@ -348,16 +383,17 @@ function CategoryGrid() {
   );
 }
 
-function CouponUpdateSection({ coupons, shops }: { coupons: Coupon[]; shops: Shop[] }) {
+function CouponUpdateSection({ coupons, shops, isWeb }: { coupons: Coupon[]; shops: Shop[]; isWeb?: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
   const animationRef = useRef<number>();
   const [, navigate] = useLocation();
+  const basePath = useBasePath();
 
   useEffect(() => {
+    if (isWeb) return;
     const container = scrollRef.current;
     if (!container || coupons.length <= 2) return;
-
     const animate = () => {
       if (!isPaused && container) {
         container.scrollLeft += 0.5;
@@ -367,30 +403,55 @@ function CouponUpdateSection({ coupons, shops }: { coupons: Coupon[]; shops: Sho
       }
       animationRef.current = requestAnimationFrame(animate);
     };
-
     animationRef.current = requestAnimationFrame(animate);
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    };
-  }, [isPaused, coupons.length]);
+    return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
+  }, [isPaused, coupons.length, isWeb]);
 
   const scroll = (direction: "left" | "right") => {
     const container = scrollRef.current;
     if (!container) return;
-    container.scrollBy({
-      left: direction === "left" ? -300 : 300,
-      behavior: "smooth",
-    });
+    container.scrollBy({ left: direction === "left" ? -300 : 300, behavior: "smooth" });
+  };
+
+  const CouponCard = ({ coupon }: { coupon: typeof coupons[0] }) => {
+    const shop = shops.find((s) => s.id === coupon.shopId);
+    if (!shop) return null;
+    return (
+      <Card
+        className={`overflow-visible cursor-pointer hover-elevate active-elevate-2 transition-transform ${isWeb ? "w-full" : "flex-shrink-0 w-[160px]"}`}
+        onClick={() => navigate(`${basePath}/shop/${shop.id}`)}
+        data-testid={`card-coupon-update-${coupon.id}`}
+      >
+        <div className="relative">
+          <img src={shop.imageUrl} alt={shop.name} className={`w-full object-cover rounded-t-md ${isWeb ? "h-[110px]" : "h-[80px]"}`} loading="lazy" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-t-md" />
+          <div className="absolute bottom-1 left-2 right-2">
+            <p className="text-white text-[10px] font-bold line-clamp-1">{shop.name}</p>
+          </div>
+          <Badge className="absolute top-1 right-1 bg-[#06C755] border-[#06C755] text-white text-[8px] px-1 py-0 gap-0.5">
+            <Ticket className="w-2 h-2" />クーポン
+          </Badge>
+        </div>
+        <div className="p-2">
+          <div className="flex items-center gap-1 mb-0.5">
+            {coupon.isLineAccountCoupon && <Badge className="bg-[#06C755] border-[#06C755] text-white text-[9px] px-1 py-0">LINE限定</Badge>}
+            {coupon.discount && <Badge variant="secondary" className="text-[9px] px-1 py-0 font-bold text-[#06C755]">{coupon.discount}</Badge>}
+          </div>
+          <h3 className="font-bold text-xs line-clamp-1" data-testid={`text-coupon-title-${coupon.id}`}>{coupon.title}</h3>
+          {coupon.description && <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{coupon.description}</p>}
+        </div>
+      </Card>
+    );
   };
 
   return (
     <section className="mb-4" data-testid="section-coupon-updates">
-      <div className="flex items-center justify-between mb-2 px-3">
+      <div className={`flex items-center justify-between mb-2 ${isWeb ? "" : "px-3"}`}>
         <div className="flex items-center gap-1.5">
           <div className="w-6 h-6 rounded bg-[#06C755]/10 flex items-center justify-center">
             <Ticket className="w-3 h-3 text-[#06C755]" />
           </div>
-          <h2 className="text-sm font-bold" data-testid="text-coupon-update-title">
+          <h2 className={`font-bold ${isWeb ? "text-base" : "text-sm"}`} data-testid="text-coupon-update-title">
             クーポン更新！
           </h2>
           <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-[#06C755]/10 text-[#06C755]">
@@ -398,89 +459,35 @@ function CouponUpdateSection({ coupons, shops }: { coupons: Coupon[]; shops: Sho
             NEW
           </Badge>
         </div>
-        <div className="flex items-center gap-0.5">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-6 w-6"
-            onClick={() => scroll("left")}
-            data-testid="button-coupon-scroll-left"
-          >
-            <ChevronLeft className="w-3 h-3" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-6 w-6"
-            onClick={() => scroll("right")}
-            data-testid="button-coupon-scroll-right"
-          >
-            <ChevronRight className="w-3 h-3" />
-          </Button>
-        </div>
+        {!isWeb && (
+          <div className="flex items-center gap-0.5">
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => scroll("left")} data-testid="button-coupon-scroll-left">
+              <ChevronLeft className="w-3 h-3" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => scroll("right")} data-testid="button-coupon-scroll-right">
+              <ChevronRight className="w-3 h-3" />
+            </Button>
+          </div>
+        )}
       </div>
 
-      <div
-        ref={scrollRef}
-        className="flex gap-2.5 overflow-x-auto scrollbar-hide px-3 pb-1"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
-        onTouchStart={() => setIsPaused(true)}
-        onTouchEnd={() => setIsPaused(false)}
-      >
-        {coupons.map((coupon) => {
-          const shop = shops.find((s) => s.id === coupon.shopId);
-          if (!shop) return null;
-          return (
-            <Card
-              key={coupon.id}
-              className="flex-shrink-0 w-[160px] overflow-visible cursor-pointer hover-elevate active-elevate-2 transition-transform"
-              onClick={() => navigate(`/app/shop/${shop.id}`)}
-              data-testid={`card-coupon-update-${coupon.id}`}
-            >
-              <div className="relative">
-                <img
-                  src={shop.imageUrl}
-                  alt={shop.name}
-                  className="w-full h-[80px] object-cover rounded-t-md"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-t-md" />
-                <div className="absolute bottom-1 left-2 right-2">
-                  <p className="text-white text-[10px] font-bold line-clamp-1">{shop.name}</p>
-                </div>
-                <Badge className="absolute top-1 right-1 bg-[#06C755] border-[#06C755] text-white text-[8px] px-1 py-0 gap-0.5">
-                  <Ticket className="w-2 h-2" />
-                  クーポン
-                </Badge>
-              </div>
-              <div className="p-2">
-                <div className="flex items-center gap-1 mb-0.5">
-                  {coupon.isLineAccountCoupon && (
-                    <Badge className="bg-[#06C755] border-[#06C755] text-white text-[9px] px-1 py-0">
-                      LINE限定
-                    </Badge>
-                  )}
-                  {coupon.discount && (
-                    <Badge variant="secondary" className="text-[9px] px-1 py-0 font-bold text-[#06C755]">
-                      {coupon.discount}
-                    </Badge>
-                  )}
-                </div>
-                <h3 className="font-bold text-xs line-clamp-1" data-testid={`text-coupon-title-${coupon.id}`}>
-                  {coupon.title}
-                </h3>
-                {coupon.description && (
-                  <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">
-                    {coupon.description}
-                  </p>
-                )}
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+      {isWeb ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {coupons.slice(0, 10).map((coupon) => <CouponCard key={coupon.id} coupon={coupon} />)}
+        </div>
+      ) : (
+        <div
+          ref={scrollRef}
+          className="flex gap-2.5 overflow-x-auto scrollbar-hide px-3 pb-1"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
+          onTouchStart={() => setIsPaused(true)}
+          onTouchEnd={() => setIsPaused(false)}
+        >
+          {coupons.map((coupon) => <CouponCard key={coupon.id} coupon={coupon} />)}
+        </div>
+      )}
     </section>
   );
 }
@@ -504,6 +511,8 @@ function LoadingSkeleton() {
 
 export default function HomePage() {
   const [, navigate] = useLocation();
+  const basePath = useBasePath();
+  const isWeb = basePath === "/web";
   const { data: shops = [], isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
   });
@@ -517,7 +526,7 @@ export default function HomePage() {
     if (area && area !== "all") params.set("area", area);
     if (category && category !== "all") params.set("category", category);
     if (keyword) params.set("q", keyword);
-    navigate(`/app/list?${params.toString()}`);
+    navigate(`${basePath}/list?${params.toString()}`);
   };
 
   const groupedShops: Record<string, Shop[]> = {};
@@ -541,38 +550,46 @@ export default function HomePage() {
 
   return (
     <div className="bg-background">
-      <HeroSection />
-      <SearchBar onSearch={handleSearch} />
+      <HeroSection isWeb={isWeb} />
+      <SearchBar onSearch={handleSearch} isWeb={isWeb} />
 
-      <div className="mt-4">
-        <AreaMapSection />
-        <CategoryGrid />
+      <div className={`mt-4 ${isWeb ? "max-w-6xl mx-auto px-4" : ""}`}>
+        {!isWeb && <AreaMapSection />}
+        <CategoryGrid isWeb={isWeb} />
 
         {!isLoading && recentCoupons.length > 0 && (
-          <CouponUpdateSection coupons={recentCoupons} shops={shops} />
+          <CouponUpdateSection coupons={recentCoupons} shops={shops} isWeb={isWeb} />
         )}
 
         {!isLoading && favoriteShops.length > 0 && (
-          <section className="mb-4 px-3" data-testid="section-favorites">
+          <section className={`mb-4 ${isWeb ? "" : "px-3"}`} data-testid="section-favorites">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
                 <div className="w-6 h-6 rounded bg-red-500/10 flex items-center justify-center">
                   <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
                 </div>
-                <h2 className="text-sm font-bold">お気に入り</h2>
+                <h2 className={`font-bold ${isWeb ? "text-base" : "text-sm"}`}>お気に入り</h2>
               </div>
-              <Link href="/app/list?fav=1">
+              <Link href={`${basePath}/list?fav=1`}>
                 <span className="text-xs text-primary cursor-pointer flex items-center gap-0.5" data-testid="link-favorites-all">
                   すべて見る
                   <ChevronRight className="w-3.5 h-3.5" />
                 </span>
               </Link>
             </div>
-            <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
-              {favoriteShops.map((shop) => (
-                <ShopCard key={shop.id} shop={shop} />
-              ))}
-            </div>
+            {isWeb ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                {favoriteShops.map((shop) => (
+                  <ShopCard key={shop.id} shop={shop} isWeb />
+                ))}
+              </div>
+            ) : (
+              <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
+                {favoriteShops.map((shop) => (
+                  <ShopCard key={shop.id} shop={shop} />
+                ))}
+              </div>
+            )}
           </section>
         )}
 
@@ -588,6 +605,7 @@ export default function HomePage() {
                   shops={catShops}
                   title={cat.name}
                   categoryId={cat.id}
+                  isWeb={isWeb}
                 />
               );
             })}
@@ -595,28 +613,30 @@ export default function HomePage() {
         )}
       </div>
 
-      <footer className="bg-card border-t py-4 px-3">
-        <div className="text-center">
-          <p className="font-bold text-primary text-xs mb-1" data-testid="text-footer-title">
-            神奈川おでかけナビ
-          </p>
-          <p className="text-[10px] text-muted-foreground mb-2">
-            神奈川県全域・静岡県東部エリアの商店街・組合加盟店のポータルサイト
-          </p>
-          <div className="flex items-center justify-center gap-2 flex-wrap">
-            {AREAS.map((a) => (
-              <Link key={a.id} href={`/app/list?area=${a.id}`}>
-                <span className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground transition-colors" data-testid={`link-footer-area-${a.id}`}>
-                  {a.name}
-                </span>
-              </Link>
-            ))}
+      {!isWeb && (
+        <footer className="bg-card border-t py-4 px-3">
+          <div className="text-center">
+            <p className="font-bold text-primary text-xs mb-1" data-testid="text-footer-title">
+              神奈川おでかけナビ
+            </p>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              神奈川県全域・静岡県東部エリアの商店街・組合加盟店のポータルサイト
+            </p>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              {AREAS.map((a) => (
+                <Link key={a.id} href={`${basePath}/list?area=${a.id}`}>
+                  <span className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground transition-colors" data-testid={`link-footer-area-${a.id}`}>
+                    {a.name}
+                  </span>
+                </Link>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-3">
+              &copy; 2026 神奈川おでかけナビ
+            </p>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-3">
-            &copy; 2026 神奈川おでかけナビ
-          </p>
-        </div>
-      </footer>
+        </footer>
+      )}
     </div>
   );
 }

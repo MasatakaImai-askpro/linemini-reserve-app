@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "wouter";
+import { useBasePath } from "@/hooks/use-base-path";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -175,6 +176,8 @@ function ImageSlider({
 export default function DetailPage() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
+  const basePath = useBasePath();
+  const isWeb = basePath === "/web";
 
   const { data: shop, isLoading } = useQuery<Shop>({
     queryKey: ["/api/shops", params.id],
@@ -217,7 +220,7 @@ export default function DetailPage() {
       <div className="bg-background flex items-center justify-center py-20">
         <Card className="p-8 text-center overflow-visible">
           <h2 className="font-bold text-lg mb-2">お店が見つかりませんでした</h2>
-          <Button variant="outline" onClick={() => navigate("/app")}>
+          <Button variant="outline" onClick={() => navigate(basePath)}>
             トップページへ戻る
           </Button>
         </Card>
@@ -235,10 +238,13 @@ export default function DetailPage() {
 
   const galleryImages = shop.galleryImageUrls?.filter(Boolean) || [];
   const sliderImages = galleryImages.length > 0 ? galleryImages : [shop.imageUrl];
+  const reservationPath = shop.reservationUrl
+    ? shop.reservationUrl.replace(/^\/(app|web|web-sp)\//, `${basePath}/`)
+    : null;
 
   return (
-    <div className="bg-background">
-      <div className="max-w-3xl mx-auto">
+    <div className={`bg-background ${isWeb ? "max-w-6xl mx-auto" : ""}`}>
+      <div className={isWeb ? "" : "max-w-3xl mx-auto"}>
         <ImageSlider
           images={sliderImages}
           shopName={shop.name}
@@ -270,7 +276,7 @@ export default function DetailPage() {
           </button>
         </div>
 
-        <div className="px-4 md:px-6 py-6 space-y-6">
+        <div className={`py-6 space-y-6 ${isWeb ? "px-6 lg:px-8" : "px-4 md:px-6"}`}>
           {regularCoupons.length > 0 && (
             <Card className="overflow-visible border-2 border-[#06C755]/30 bg-gradient-to-br from-[#06C755]/5 to-card">
               <div className="p-5">
@@ -364,12 +370,12 @@ export default function DetailPage() {
             </p>
           </Card>
 
-          {shop.reservationUrl && (
+          {reservationPath && (
             <Button
               className="w-full bg-primary text-primary-foreground font-bold py-6 text-base"
               asChild
             >
-              <Link href={shop.reservationUrl} data-testid="link-reservation-mid">
+              <Link href={reservationPath} data-testid="link-reservation-mid">
                 <CalendarCheck className="w-5 h-5 mr-2" />
                 予約する
               </Link>
@@ -442,12 +448,12 @@ export default function DetailPage() {
             </a>
           </Card>
 
-          {shop.reservationUrl && (
+          {reservationPath && (
             <Button
               className="w-full bg-primary text-primary-foreground font-bold py-6 text-base"
               asChild
             >
-              <Link href={shop.reservationUrl} data-testid="link-reservation-bottom">
+              <Link href={reservationPath} data-testid="link-reservation-bottom">
                 <CalendarCheck className="w-5 h-5 mr-2" />
                 予約する
               </Link>
@@ -455,12 +461,12 @@ export default function DetailPage() {
           )}
 
           <div className="flex items-center justify-center gap-2 py-4">
-            <Button variant="outline" onClick={() => navigate("/app")} data-testid="button-back-bottom">
+            <Button variant="outline" onClick={() => navigate(basePath)} data-testid="button-back-bottom">
               <ArrowLeft className="w-4 h-4 mr-1" />
               戻る
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/app" data-testid="link-top-bottom">
+              <Link href={basePath} data-testid="link-top-bottom">
                 トップページ
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Link>
@@ -469,18 +475,20 @@ export default function DetailPage() {
         </div>
       </div>
 
-      <footer className="bg-card border-t py-6 px-4 mt-4">
-        <div className="max-w-3xl mx-auto text-center">
-          <Link href="/app">
-            <span className="text-sm font-bold text-primary cursor-pointer" data-testid="link-footer-detail-home">
-              神奈川おでかけナビ
-            </span>
-          </Link>
-          <p className="text-xs text-muted-foreground mt-2">
-            &copy; 2026 神奈川おでかけナビ All Rights Reserved.
-          </p>
-        </div>
-      </footer>
+      {!isWeb && (
+        <footer className="bg-card border-t py-6 px-4 mt-4">
+          <div className="max-w-3xl mx-auto text-center">
+            <Link href={basePath}>
+              <span className="text-sm font-bold text-primary cursor-pointer" data-testid="link-footer-detail-home">
+                神奈川おでかけナビ
+              </span>
+            </Link>
+            <p className="text-xs text-muted-foreground mt-2">
+              &copy; 2026 神奈川おでかけナビ All Rights Reserved.
+            </p>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }
