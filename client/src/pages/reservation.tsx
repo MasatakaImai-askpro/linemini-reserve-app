@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "wouter";
+import { useBasePath } from "@/hooks/use-base-path";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
@@ -29,6 +30,7 @@ export default function ReservationPage() {
   const params = useParams<{ id: string }>();
   const shopId = parseInt(params.id || "0");
   const [, navigate] = useLocation();
+  const basePath = useBasePath();
 
   const { data: shop, isLoading } = useQuery<Shop>({
     queryKey: ["/api/shops", params.id],
@@ -102,7 +104,7 @@ export default function ReservationPage() {
       <div className="bg-background flex items-center justify-center py-20">
         <Card className="p-8 text-center overflow-visible">
           <h2 className="font-bold text-lg mb-2">お店が見つかりませんでした</h2>
-          <Button variant="outline" onClick={() => navigate("/app")}>
+          <Button variant="outline" onClick={() => navigate(basePath)}>
             トップページへ戻る
           </Button>
         </Card>
@@ -233,14 +235,14 @@ export default function ReservationPage() {
             time={selectedTime}
             reservationId={reservationId}
             reservationToken={reservationToken}
-            onClose={() => navigate(`/app/shop/${shop.id}`)}
+            onClose={() => navigate(`${basePath}/shop/${shop.id}`)}
           />
         )}
       </div>
 
       <footer className="bg-card border-t py-6 px-4 mt-4">
         <div className="max-w-lg mx-auto text-center">
-          <Link href="/app">
+          <Link href={basePath}>
             <span className="text-sm font-bold text-primary cursor-pointer" data-testid="link-footer-reservation-home">
               神奈川おでかけナビ
             </span>

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
+import { useBasePath } from "@/hooks/use-base-path";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +44,7 @@ export default function ListPage() {
   const [keyword, setKeyword] = useState(initialQ);
   const [favOnly, setFavOnly] = useState(params.get("fav") === "1");
   const [, navigate] = useLocation();
+  const basePath = useBasePath();
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
 
   const subcategoryOptions = category !== "all" ? (SUBCATEGORIES[category] ?? []) : [];
@@ -218,7 +220,7 @@ export default function ListPage() {
       )}
 
       <footer className="text-center py-4 mt-4">
-        <Link href="/app">
+        <Link href={basePath}>
           <span className="text-xs font-bold text-primary cursor-pointer" data-testid="link-footer-home">
             神奈川おでかけナビ
           </span>
@@ -233,9 +235,10 @@ export default function ListPage() {
 
 function ListShopCard({ shop, isFav, onToggleFav }: { shop: Shop; isFav: boolean; onToggleFav: () => void }) {
   const recentlyUpdated = isRecentlyUpdated(shop.updatedAt);
+  const basePath = useBasePath();
 
   return (
-    <Link href={`/app/shop/${shop.id}`}>
+    <Link href={`${basePath}/shop/${shop.id}`}>
       <Card
         className="overflow-hidden cursor-pointer hover-elevate active-elevate-2 transition-transform"
         data-testid={`card-list-shop-${shop.id}`}

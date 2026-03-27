@@ -25,6 +25,7 @@ import {
   CircleAlert,
   CircleDashed,
   ExternalLink,
+  Unlink,
 } from "lucide-react";
 import { SiStripe } from "react-icons/si";
 import type { Shop } from "@shared/schema";
@@ -172,6 +173,21 @@ function StripeConnectPanel({ shopId }: { shopId: number }) {
     },
   });
 
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/stripe/connect/disconnect/${shopId}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Stripe連携を解除しました" });
+      refetchStripeStatus();
+      queryClient.invalidateQueries({ queryKey: ["/api/stripe/connect/status", shopId] });
+    },
+    onError: (err: any) => {
+      toast({ title: "連携解除に失敗しました", description: err?.message || "", variant: "destructive" });
+    },
+  });
+
   return (
     <div data-testid="admin-shop-payment">
       <div className="mb-4">
@@ -245,6 +261,23 @@ function StripeConnectPanel({ shopId }: { shopId: number }) {
             >
               <ExternalLink className="w-3.5 h-3.5" />
               {dashboardMutation.isPending ? "取得中..." : "Stripeダッシュボードを開く"}
+            </Button>
+          )}
+          {stripeStatus?.accountId && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => {
+                if (window.confirm("Stripe連携を解除しますか？\n解除後は事前決済が利用できなくなります。")) {
+                  disconnectMutation.mutate();
+                }
+              }}
+              disabled={disconnectMutation.isPending}
+              data-testid="button-stripe-disconnect"
+            >
+              <Unlink className="w-3.5 h-3.5" />
+              {disconnectMutation.isPending ? "解除中..." : "連携を解除"}
             </Button>
           )}
           <Button

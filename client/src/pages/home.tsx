@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
+import { useBasePath } from "@/hooks/use-base-path";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -245,6 +246,7 @@ function AutoScrollRow({ shops, title, categoryId, icon }: { shops: Shop[]; titl
 
 function ShopCard({ shop }: { shop: Shop }) {
   const [, navigate] = useLocation();
+  const basePath = useBasePath();
   const { isFavorite, toggleFavorite } = useFavorites();
   const recentlyUpdated = isRecentlyUpdated(shop.updatedAt);
   const favorited = isFavorite(shop.id);
@@ -252,7 +254,7 @@ function ShopCard({ shop }: { shop: Shop }) {
   return (
     <Card
       className="flex-shrink-0 w-[160px] overflow-visible cursor-pointer hover-elevate active-elevate-2 transition-transform"
-      onClick={() => navigate(`/app/shop/${shop.id}`)}
+      onClick={() => navigate(`${basePath}/shop/${shop.id}`)}
       data-testid={`card-shop-${shop.id}`}
     >
       <div className="relative">
@@ -316,6 +318,7 @@ function AreaMapSection() {
 
 function CategoryGrid() {
   const [, navigate] = useLocation();
+  const basePath = useBasePath();
 
   return (
     <section className="mb-4 px-3">
@@ -333,7 +336,7 @@ function CategoryGrid() {
             <Card
               key={cat.id}
               className="p-2.5 flex flex-col items-center gap-1 cursor-pointer hover-elevate active-elevate-2 overflow-visible"
-              onClick={() => navigate(`/app/list?category=${cat.id}`)}
+              onClick={() => navigate(`${basePath}/list?category=${cat.id}`)}
               data-testid={`card-category-${cat.id}`}
             >
               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -353,6 +356,7 @@ function CouponUpdateSection({ coupons, shops }: { coupons: Coupon[]; shops: Sho
   const [isPaused, setIsPaused] = useState(false);
   const animationRef = useRef<number>();
   const [, navigate] = useLocation();
+  const basePath = useBasePath();
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -436,7 +440,7 @@ function CouponUpdateSection({ coupons, shops }: { coupons: Coupon[]; shops: Sho
             <Card
               key={coupon.id}
               className="flex-shrink-0 w-[160px] overflow-visible cursor-pointer hover-elevate active-elevate-2 transition-transform"
-              onClick={() => navigate(`/app/shop/${shop.id}`)}
+              onClick={() => navigate(`${basePath}/shop/${shop.id}`)}
               data-testid={`card-coupon-update-${coupon.id}`}
             >
               <div className="relative">
@@ -504,6 +508,7 @@ function LoadingSkeleton() {
 
 export default function HomePage() {
   const [, navigate] = useLocation();
+  const basePath = useBasePath();
   const { data: shops = [], isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
   });
@@ -517,7 +522,7 @@ export default function HomePage() {
     if (area && area !== "all") params.set("area", area);
     if (category && category !== "all") params.set("category", category);
     if (keyword) params.set("q", keyword);
-    navigate(`/app/list?${params.toString()}`);
+    navigate(`${basePath}/list?${params.toString()}`);
   };
 
   const groupedShops: Record<string, Shop[]> = {};
@@ -561,7 +566,7 @@ export default function HomePage() {
                 </div>
                 <h2 className="text-sm font-bold">お気に入り</h2>
               </div>
-              <Link href="/app/list?fav=1">
+              <Link href={`${basePath}/list?fav=1`}>
                 <span className="text-xs text-primary cursor-pointer flex items-center gap-0.5" data-testid="link-favorites-all">
                   すべて見る
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -605,7 +610,7 @@ export default function HomePage() {
           </p>
           <div className="flex items-center justify-center gap-2 flex-wrap">
             {AREAS.map((a) => (
-              <Link key={a.id} href={`/app/list?area=${a.id}`}>
+              <Link key={a.id} href={`${basePath}/list?area=${a.id}`}>
                 <span className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground transition-colors" data-testid={`link-footer-area-${a.id}`}>
                   {a.name}
                 </span>
