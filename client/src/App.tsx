@@ -20,37 +20,21 @@ import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
 
-function LineAppRouter() {
-  return (
-    <LineAppFrame>
-      <Switch>
-        <Route path="/app" component={HomePage} />
-        <Route path="/app/list" component={ListPage} />
-        <Route path="/app/shop/:id" component={DetailPage} />
-        <Route path="/app/reservation/:id" component={ReservationPage} />
-        <Route path="/app/cancel/:shopId/:token" component={CancelPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </LineAppFrame>
-  );
-}
+// ─── ページラッパー（トップレベルで定義してReact Hooks順序を固定） ───
+function AppHome()        { return <LineAppFrame><HomePage /></LineAppFrame>; }
+function AppList()        { return <LineAppFrame><ListPage /></LineAppFrame>; }
+function AppDetail()      { return <LineAppFrame><DetailPage /></LineAppFrame>; }
+function AppReservation() { return <LineAppFrame><ReservationPage /></LineAppFrame>; }
+function AppCancel()      { return <LineAppFrame><CancelPage /></LineAppFrame>; }
+function AppNotFound()    { return <LineAppFrame><NotFound /></LineAppFrame>; }
 
-function WebRouter() {
-  return (
-    <WebAppFrame>
-      <Switch>
-        <Route path="/web" component={HomePage} />
-        <Route path="/web/list" component={ListPage} />
-        <Route path="/web/shop/:id" component={DetailPage} />
-        <Route path="/web/reservation/:id" component={ReservationPage} />
-        <Route path="/web/cancel/:shopId/:token" component={CancelPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </WebAppFrame>
-  );
-}
+function WebHome()        { return <WebAppFrame><HomePage /></WebAppFrame>; }
+function WebList()        { return <WebAppFrame><ListPage /></WebAppFrame>; }
+function WebDetail()      { return <WebAppFrame><DetailPage /></WebAppFrame>; }
+function WebReservation() { return <WebAppFrame><ReservationPage /></WebAppFrame>; }
+function WebCancel()      { return <WebAppFrame><CancelPage /></WebAppFrame>; }
 
-
+// ─── 管理者ルート ───
 function AdminRoute() {
   const { user, isLoading } = useAuth();
   const [, navigate] = useLocation();
@@ -107,17 +91,31 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Switch>
+          {/* 共通 */}
           <Route path="/" component={LandingPage} />
           <Route path="/login" component={LoginPage} />
+          <Route path="/line" component={LineDemoPage} />
           <Route path="/admin" component={AdminRoute} />
           <Route path="/admin/shop/:id" component={ShopAdminRoute} />
-          <Route path="/line" component={LineDemoPage} />
-          <Route path="/reservation/:id" component={ReservationPage} />
-          <Route path="/cancel/:shopId/:token" component={CancelPage} />
-          <Route path="/web/:rest*" component={WebRouter} />
-          <Route path="/web" component={WebRouter} />
-          <Route path="/app/:rest*" component={LineAppRouter} />
-          <Route component={LineAppRouter} />
+
+          {/* LINEミニアプリ (/app/*) */}
+          <Route path="/app" component={AppHome} />
+          <Route path="/app/list" component={AppList} />
+          <Route path="/app/shop/:id" component={AppDetail} />
+          <Route path="/app/reservation/:id" component={AppReservation} />
+          <Route path="/app/cancel/:shopId/:token" component={AppCancel} />
+
+          {/* WEBサイト (/web/*) */}
+          <Route path="/web" component={WebHome} />
+          <Route path="/web/list" component={WebList} />
+          <Route path="/web/shop/:id" component={WebDetail} />
+          <Route path="/web/reservation/:id" component={WebReservation} />
+          <Route path="/web/cancel/:shopId/:token" component={WebCancel} />
+
+          {/* その他 */}
+          <Route path="/reservation/:id" component={AppReservation} />
+          <Route path="/cancel/:shopId/:token" component={AppCancel} />
+          <Route component={AppNotFound} />
         </Switch>
       </TooltipProvider>
     </QueryClientProvider>
