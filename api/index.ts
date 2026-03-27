@@ -194,7 +194,6 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
     } catch (e: any) { console.error("shop create error:", e); res.status(500).json({ message: "Failed to create shop" }); }
   })
 
-);
 
   app.put("/api/shops/:id", async (req, res) => {
     try {
@@ -229,7 +228,6 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
     } catch (e: any) { console.error("shop update error:", e); res.status(500).json({ message: "Failed to update shop" }); }
   });
 
-);
 
   app.post("/api/shops/:id/like", async (req, res) => {
     try {
@@ -291,7 +289,6 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
     } catch (e: any) { console.error("coupon update error:", e); res.status(500).json({ message: "Failed to update coupon" }); }
   });
 
-);
 
   app.delete("/api/coupons/:id", async (req, res) => {
     try {
@@ -591,7 +588,6 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
     } catch (e: any) { console.error("res update error:", e); res.status(500).json({ message: "Failed to update reservation" }); }
   });
 
-);
 
   app.delete("/api/shops/:shopId/reservations", async (req, res) => {
     const shopId = parseInt(req.params.shopId);
@@ -1271,6 +1267,8 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
     console.error("Internal error:", err);
     res.status(err.status || 500).json({ message: err.message || "Internal Server Error" });
   });
+
+  export { app };
 
   export default async function handler(req: VercelRequest, res: VercelResponse) {
     return app(req as any, res as any);
