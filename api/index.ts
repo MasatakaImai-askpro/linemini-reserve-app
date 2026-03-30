@@ -4,6 +4,7 @@ import { createServer } from "http";
 import type { Request, Response, NextFunction } from "express";
 import { neon } from "@neondatabase/serverless";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -39,23 +40,6 @@ const upload = multer({
   },
 });
 
-// ─── 認証ユーティリティ ───
-function hashPassword(p: string) { return crypto.createHash("sha256").update(p).digest("hex"); }
-
-// ─── 予約テーブル初期化 ───
-let tablesInitialized = false;
-async function initBookingTables() {
-  if (tablesInitialized) return;
-  try {
-    await sql`CREATE TABLE IF NOT EXISTS booking_staff (id SERIAL PRIMARY KEY, shop_id INTEGER NOT NULL, name TEXT NOT NULL, role TEXT DEFAULT '', avatar TEXT DEFAULT '', is_active BOOLEAN DEFAULT true, created_at TIMESTAMP DEFAULT NOW())`;
-    await sql`CREATE TABLE IF NOT EXISTS booking_courses (id SERIAL PRIMARY KEY, shop_id INTEGER NOT NULL, name TEXT NOT NULL, category TEXT DEFAULT '', duration INTEGER DEFAULT 60, price INTEGER DEFAULT 0, description TEXT DEFAULT '', prepayment_only BOOLEAN DEFAULT false, image_url TEXT, staff_ids TEXT[] DEFAULT '{}', is_active BOOLEAN DEFAULT true, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW())`;
-    await sql`CREATE TABLE IF NOT EXISTS booking_reservations (id SERIAL PRIMARY KEY, shop_id INTEGER NOT NULL, customer_name TEXT NOT NULL, customer_phone TEXT, customer_email TEXT, date TEXT NOT NULL, time TEXT NOT NULL, staff_id TEXT DEFAULT '__shop__', course_id TEXT NOT NULL, status TEXT DEFAULT 'confirmed', paid BOOLEAN DEFAULT false, cancel_token TEXT UNIQUE, created_at TIMESTAMP DEFAULT NOW())`;
-    await sql`CREATE TABLE IF NOT EXISTS booking_settings (shop_id INTEGER PRIMARY KEY, store_name TEXT DEFAULT '', store_description TEXT DEFAULT '', store_address TEXT DEFAULT '', store_phone TEXT DEFAULT '', store_email TEXT DEFAULT '', store_hours TEXT DEFAULT '', store_closed_days TEXT DEFAULT '', banner_url TEXT DEFAULT '', staff_selection_enabled TEXT DEFAULT 'false', table_count INTEGER DEFAULT 0, max_party_size INTEGER DEFAULT 0, updated_at TIMESTAMP DEFAULT NOW())`;
-    await sql`ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS table_count INTEGER DEFAULT 0`;
-    await sql`ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS max_party_size INTEGER DEFAULT 0`;
-    tablesInitialized = true;
-  } catch (e) { console.error("initBookingTables error:", e); }
-}
 
 // ─── デモデータ ───
 const DEMO_DATA: Record<number, { staff: { name: string; role: string; avatar: string }[]; courses: { name: string; category: string; duration: number; price: number; description: string; prepaymentOnly: boolean }[]; settings: Record<string, string>; }> = {
@@ -147,9 +131,6 @@ export function ensureSetup(): Promise<void> {
         if (!req.file) return res.status(400).json({ message: "No image file provided" });
         res.json({ url: `/uploads/${req.file.filename}` });
       });
-
-      // 予約テーブル初期化ミドルウェア
-      app.use(async (_req, _res, next) => { try { await initBookingTables(); } catch {} next(); });
 
       // ─── エリア・カテゴリ ───
       app.get("/api/areas", async (_req, res) => { try { res.json(await sql`SELECT * FROM areas ORDER BY id`); } catch { res.status(500).json({ message: "Failed to fetch areas" }); } });
@@ -285,7 +266,8 @@ export function ensureSetup(): Promise<void> {
           if (!username || !password) return res.status(400).json({ message: "Username and password required" });
           const rows = await sql`SELECT * FROM users WHERE username = ${username}`;
           const user = rows[0]; if (!user) return res.status(401).json({ message: "Invalid credentials" });
-          if (user.password_hash !== password && hashPassword(password) !== user.password_hash) return res.status(401).json({ message: "Invalid credentials" });
+          const valid = await bcrypt.compare(password, user.password_hash);
+          if (!valid) return res.status(401).json({ message: "Invalid credentials" });
           const payload = { userId: user.id, role: user.role, shopId: user.shop_id, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 };
           const token = Buffer.from(JSON.stringify(payload)).toString("base64");
           res.json({ id: user.id, username: user.username, role: user.role, shopId: user.shop_id, token });
