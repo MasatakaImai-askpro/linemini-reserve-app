@@ -30,14 +30,6 @@ export const discountTypeEnum = pgEnum("discount_type", [
   "AMOUNT", "PERCENTAGE", "FREE"
 ]);
 
-export const reservationStatusEnum = pgEnum("reservation_status", [
-  "PENDING", "CONFIRMED", "CANCELLED", "VISITED"
-]);
-
-export const orderStatusEnum = pgEnum("order_status", [
-  "PENDING", "PAID", "REFUNDED", "FAILED"
-]);
-
 // ─────────────────────────────
 // エリアマスタ
 // ─────────────────────────────
@@ -109,67 +101,6 @@ export const shops = pgTable("shops", {
 });
 
 // ─────────────────────────────
-// 店舗オーナー（管理画面ユーザー）
-// ─────────────────────────────
-export const storeOwners = pgTable("store_owners", {
-  id:        serial("id").primaryKey(),
-  email:     text("email").notNull().unique(),
-  password:  text("password").notNull(),
-  shopId:    integer("shop_id").notNull().unique(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-// ─────────────────────────────
-// コース・メニュー
-// ─────────────────────────────
-export const storeServices = pgTable("store_services", {
-  id:                 serial("id").primaryKey(),
-  shopId:             integer("shop_id").notNull(),
-  name:               text("name").notNull(),
-  description:        text("description"),
-  duration:           integer("duration"),
-  price:              integer("price"),
-  imageUrl:           text("image_url"),
-  staffIds:           integer("staff_id").array(),
-  requiresPrepayment: boolean("requires_prepayment").notNull().default(false),
-  isActive:           boolean("is_active").notNull().default(true),
-  updatedAt:          timestamp("updated_at").notNull().defaultNow(),
-  createdAt:          timestamp("created_at").notNull().defaultNow(),
-});
-
-// ─────────────────────────────
-// スタッフ
-// ─────────────────────────────
-export const storeStaff = pgTable("store_staff", {
-  id:        serial("id").primaryKey(),
-  shopId:    integer("shop_id").notNull(),
-  name:      text("name").notNull(),
-  role:      text("role"),
-  iconUrl:   text("icon_url"),
-  isActive:  boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-// ─────────────────────────────
-// 予約
-// ─────────────────────────────
-export const reservations = pgTable("reservations", {
-  id:            serial("id").primaryKey(),
-  shopId:        integer("shop_id").notNull(),
-  serviceId:     integer("service_id"),
-  staffId:       integer("staff_id"),
-  customerName:  text("customer_name").notNull(),
-  customerPhone: text("customer_phone"),
-  customerEmail: text("customer_email"),
-  scheduledAt:   timestamp("scheduled_at").notNull(),
-  status:        reservationStatusEnum("status").notNull().default("PENDING"),
-  reservationToken:   text("reservation_token").notNull().unique(),
-  createdAt:     timestamp("created_at").notNull().defaultNow(),
-  updatedAt:     timestamp("updated_at").notNull().defaultNow(),
-});
-
-// ─────────────────────────────
 // クーポン
 // ─────────────────────────────
 export const coupons = pgTable("coupons", {
@@ -191,23 +122,7 @@ export const coupons = pgTable("coupons", {
 });
 
 // ─────────────────────────────
-// スロット（スタッフごとの空き枠）
-// ─────────────────────────────
-export const storeSlots = pgTable("store_slots", {
-  id:          serial("id").primaryKey(),
-  shopId:      integer("shop_id").notNull(),
-  staffId:     integer("staff_id").notNull(),
-  dayOfWeek:   integer("day_of_week").notNull(),
-  time:        text("time").notNull(),
-  isAvailable: boolean("is_available").notNull().default(true),
-  updatedAt:   timestamp("updated_at").notNull().defaultNow(),
-  createdAt:   timestamp("created_at").notNull().defaultNow(),
-}, (t) => [
-  uniqueIndex("store_slots_staff_day_time_idx").on(t.staffId, t.dayOfWeek, t.time),
-]);
-
-// ─────────────────────────────
-// 中間テーブル（カテゴリ × 各要素）
+// 中間テーブル（店舗 × カテゴリ）
 // ─────────────────────────────
 export const shopCategories = pgTable("shop_categories", {
   shopId:     integer("shop_id").notNull(),
@@ -216,77 +131,103 @@ export const shopCategories = pgTable("shop_categories", {
   uniqueIndex("shop_categories_idx").on(t.shopId, t.categoryId),
 ]);
 
-export const serviceCategories = pgTable("service_categories", {
-  serviceId:  integer("service_id").notNull(),
-  categoryId: integer("category_id").notNull(),
-}, (t) => [
-  uniqueIndex("service_categories_idx").on(t.serviceId, t.categoryId),
-]);
+// ─────────────────────────────
+// 予約：スタッフ
+// ─────────────────────────────
+export const bookingStaff = pgTable("booking_staff", {
+  id:        serial("id").primaryKey(),
+  shopId:    integer("shop_id").notNull(),
+  name:      text("name").notNull(),
+  role:      text("role").default(""),
+  avatar:    text("avatar").default(""),
+  isActive:  boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
-export const staffCategories = pgTable("staff_categories", {
-  staffId:    integer("staff_id").notNull(),
-  categoryId: integer("category_id").notNull(),
+// ─────────────────────────────
+// 予約：コース
+// ─────────────────────────────
+export const bookingCourses = pgTable("booking_courses", {
+  id:             serial("id").primaryKey(),
+  shopId:         integer("shop_id").notNull(),
+  name:           text("name").notNull(),
+  category:       text("category").default(""),
+  duration:       integer("duration").default(60),
+  price:          integer("price").default(0),
+  description:    text("description").default(""),
+  prepaymentOnly: boolean("prepayment_only").default(false),
+  imageUrl:       text("image_url"),
+  staffIds:       text("staff_ids").array().default([]),
+  isActive:       boolean("is_active").default(true),
+  createdAt:      timestamp("created_at").defaultNow(),
+  updatedAt:      timestamp("updated_at").defaultNow(),
+});
+
+// ─────────────────────────────
+// 予約：予約データ
+// ─────────────────────────────
+export const bookingReservations = pgTable("booking_reservations", {
+  id:            serial("id").primaryKey(),
+  shopId:        integer("shop_id").notNull(),
+  customerName:  text("customer_name").notNull(),
+  customerPhone: text("customer_phone"),
+  customerEmail: text("customer_email"),
+  date:          text("date").notNull(),
+  time:          text("time").notNull(),
+  staffId:       text("staff_id").default("__shop__"),
+  courseId:      text("course_id").notNull(),
+  status:        text("status").default("confirmed"),
+  paid:          boolean("paid").default(false),
+  cancelToken:   text("cancel_token"),
+  createdAt:     timestamp("created_at").defaultNow(),
 }, (t) => [
-  uniqueIndex("staff_categories_idx").on(t.staffId, t.categoryId),
+  uniqueIndex("booking_reservations_cancel_token_idx").on(t.cancelToken),
 ]);
 
 // ─────────────────────────────
-// 決済（将来追加）
+// 予約：店舗設定
 // ─────────────────────────────
-export const orders = pgTable("orders", {
-  id:              serial("id").primaryKey(),
-  shopId:          integer("shop_id").notNull(),
-  reservationId:   integer("reservation_id").unique(),
-  stripePaymentId: text("stripe_payment_id"),
-  amount:          integer("amount").notNull(),
-  status:          orderStatusEnum("status").notNull().default("PENDING"),
-  createdAt:       timestamp("created_at").notNull().defaultNow(),
+export const bookingSettings = pgTable("booking_settings", {
+  shopId:               integer("shop_id").primaryKey(),
+  storeName:            text("store_name").default(""),
+  storeDescription:     text("store_description").default(""),
+  storeAddress:         text("store_address").default(""),
+  storePhone:           text("store_phone").default(""),
+  storeEmail:           text("store_email").default(""),
+  storeHours:           text("store_hours").default(""),
+  storeClosedDays:      text("store_closed_days").default(""),
+  bannerUrl:            text("banner_url").default(""),
+  staffSelectionEnabled: text("staff_selection_enabled").default("false"),
+  tableCount:           integer("table_count").default(0),
+  maxPartySize:         integer("max_party_size").default(0),
+  updatedAt:            timestamp("updated_at").defaultNow(),
 });
 
 // ─────────────────────────────
 // Zodスキーマ（自動生成）
 // ─────────────────────────────
-export const insertAreaSchema            = createInsertSchema(areas).omit({ id: true });
-export const insertCategorySchema        = createInsertSchema(categories).omit({ id: true });
-export const insertShopSchema            = createInsertSchema(shops).omit({ id: true });
-export const insertStoreOwnerSchema      = createInsertSchema(storeOwners).omit({ id: true });
-export const insertStoreServiceSchema    = createInsertSchema(storeServices).omit({ id: true });
-export const insertStoreStaffSchema      = createInsertSchema(storeStaff).omit({ id: true });
-export const insertReservationSchema     = createInsertSchema(reservations).omit({ id: true });
-export const insertCouponSchema          = createInsertSchema(coupons).omit({ id: true });
-export const insertStoreSlotSchema       = createInsertSchema(storeSlots).omit({ id: true });
-export const insertShopCategorySchema    = createInsertSchema(shopCategories);
-export const insertServiceCategorySchema = createInsertSchema(serviceCategories);
-export const insertStaffCategorySchema   = createInsertSchema(staffCategories);
+export const insertAreaSchema         = createInsertSchema(areas).omit({ id: true });
+export const insertCategorySchema     = createInsertSchema(categories).omit({ id: true });
+export const insertShopSchema         = createInsertSchema(shops).omit({ id: true });
+export const insertCouponSchema       = createInsertSchema(coupons).omit({ id: true });
+export const insertShopCategorySchema = createInsertSchema(shopCategories);
 
-export const selectAreaSchema            = createSelectSchema(areas);
-export const selectCategorySchema        = createSelectSchema(categories);
-export const selectShopSchema            = createSelectSchema(shops);
-export const selectStoreServiceSchema    = createSelectSchema(storeServices);
-export const selectStoreStaffSchema      = createSelectSchema(storeStaff);
-export const selectReservationSchema     = createSelectSchema(reservations);
-export const selectCouponSchema          = createSelectSchema(coupons);
-export const selectStoreSlotSchema       = createSelectSchema(storeSlots);
+export const selectAreaSchema     = createSelectSchema(areas);
+export const selectCategorySchema = createSelectSchema(categories);
+export const selectShopSchema     = createSelectSchema(shops);
+export const selectCouponSchema   = createSelectSchema(coupons);
 
 // ─────────────────────────────
 // 型エクスポート
 // ─────────────────────────────
-export type InsertArea         = z.infer<typeof insertAreaSchema>;
-export type Area               = typeof areas.$inferSelect;
-export type InsertCategory     = z.infer<typeof insertCategorySchema>;
-export type Category           = typeof categories.$inferSelect;
-export type InsertShop         = z.infer<typeof insertShopSchema>;
-export type Shop               = typeof shops.$inferSelect;
-export type InsertStoreService = z.infer<typeof insertStoreServiceSchema>;
-export type StoreService       = typeof storeServices.$inferSelect;
-export type InsertStoreStaff   = z.infer<typeof insertStoreStaffSchema>;
-export type StoreStaff         = typeof storeStaff.$inferSelect;
-export type InsertReservation  = z.infer<typeof insertReservationSchema>;
-export type Reservation        = typeof reservations.$inferSelect;
-export type InsertCoupon       = z.infer<typeof insertCouponSchema>;
-export type Coupon             = typeof coupons.$inferSelect;
-export type InsertStoreSlot    = z.infer<typeof insertStoreSlotSchema>;
-export type StoreSlot          = typeof storeSlots.$inferSelect;
+export type InsertArea     = z.infer<typeof insertAreaSchema>;
+export type Area           = typeof areas.$inferSelect;
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
+export type Category       = typeof categories.$inferSelect;
+export type InsertShop     = z.infer<typeof insertShopSchema>;
+export type Shop           = typeof shops.$inferSelect;
+export type InsertCoupon   = z.infer<typeof insertCouponSchema>;
+export type Coupon         = typeof coupons.$inferSelect;
 
 // ─────────────────────────────
 // 定数（seed投入用・DB移行後は削除可）
