@@ -15,11 +15,6 @@ export async function runMigrations() {
     `ALTER TABLE coupons ADD COLUMN IF NOT EXISTS is_line_account_coupon boolean NOT NULL DEFAULT false`,
     `ALTER TABLE coupons ALTER COLUMN discount_type SET DEFAULT 'FREE'`,
     `ALTER TABLE coupons ALTER COLUMN discount_value SET DEFAULT 0`,
-    // store_services テーブルへの追加カラム (PR#5)
-    `ALTER TABLE store_services ADD COLUMN IF NOT EXISTS image_url text`,
-    `ALTER TABLE store_services ADD COLUMN IF NOT EXISTS staff_id integer[]`,
-    // reservations テーブル: cancel_token → reservation_token (PR#5)
-    `ALTER TABLE reservations ADD COLUMN IF NOT EXISTS reservation_token text`,
   ];
 
   for (const migration of migrations) {
