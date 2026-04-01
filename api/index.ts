@@ -19,8 +19,11 @@ export const httpServer = createServer(app);
 const sql = neon(process.env.DATABASE_URL!);
 
 // ─── ファイルアップロード ───
-const uploadsDir = path.join(process.cwd(), "server", "uploads");
-fs.mkdirSync(uploadsDir, { recursive: true });
+// Vercel serverless は読み取り専用FSのため /tmp を使用。ローカルは server/uploads
+const uploadsDir = process.env.VERCEL
+  ? "/tmp/uploads"
+  : path.join(process.cwd(), "server", "uploads");
+try { fs.mkdirSync(uploadsDir, { recursive: true }); } catch { /* read-only FS (Vercel) の場合は無視 */ }
 
 const MIME_TO_EXT: Record<string, string> = {
   "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif", "image/webp": ".webp",
