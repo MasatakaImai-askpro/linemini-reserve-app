@@ -150,7 +150,11 @@ function SearchBar({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">すべてのエリア</SelectItem>
-            {AREAS.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+            {AREAS.map((a) => (
+              <SelectItem key={a.slug} value={a.slug}>
+                {a.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={category} onValueChange={setCategory}>
@@ -159,7 +163,11 @@ function SearchBar({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">すべての業種</SelectItem>
-            {CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            {CATEGORIES.map((c) => (
+              <SelectItem key={c.slug} value={c.slug}>
+                {c.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <div className="flex flex-1 gap-2">
@@ -195,9 +203,10 @@ function AutoScrollRow({ shops, title, categoryId, icon, isWeb }: { shops: Shop[
     if (!container || shops.length <= 2) return;
     const animate = () => {
       if (!isPaused && container) {
-        container.scrollLeft += scrollSpeedRef.current;
-        if (container.scrollLeft >= container.scrollWidth - container.clientWidth) {
-          container.scrollLeft = 0;
+        const maxScroll = container.scrollWidth - container.clientWidth
+        if (container.scrollLeft < maxScroll -1) {
+          container.scrollLeft += scrollSpeedRef.current;
+        } else {
         }
       }
       animationRef.current = requestAnimationFrame(animate);
@@ -209,7 +218,30 @@ function AutoScrollRow({ shops, title, categoryId, icon, isWeb }: { shops: Shop[
   const scroll = (direction: "left" | "right") => {
     const container = scrollRef.current;
     if (!container) return;
-    container.scrollBy({ left: direction === "left" ? -300 : 300, behavior: "smooth" });
+
+    const firstCard = container.querySelector(":first-child") as HTMLElement;
+    if(!firstCard) return;
+
+    const cardWidth = firstCard.getBoundingClientRect().width;
+    const gap = 10;
+    const scrollAmount = (cardWidth + gap) * 2;
+
+    const currentScroll = container.scrollLeft;
+    const maxScroll = container.scrollWidth - container.clientWidth;
+
+    // 右クリックで既に右端にいるなら何もしない
+    if (direction === "right" && currentScroll >= maxScroll - 5) return;
+    // 左クリックで既に左端にいるなら何もしない
+    if (direction === "left" && currentScroll <= 5) return;
+
+    setIsPaused(true);
+    container.scrollBy({
+      left: direction === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
+    setTimeout(() => {
+      setIsPaused(false);
+    }, 500)
   };
 
   const IconComponent = icon || categoryIcons[categoryId] || MapPinned;
@@ -396,9 +428,13 @@ function CouponUpdateSection({ coupons, shops, isWeb }: { coupons: Coupon[]; sho
     if (!container || coupons.length <= 2) return;
     const animate = () => {
       if (!isPaused && container) {
-        container.scrollLeft += 0.5;
-        if (container.scrollLeft >= container.scrollWidth - container.clientWidth) {
-          container.scrollLeft = 0;
+        // 現在の端っこまでの余裕を計算
+        const maxScroll = container.scrollWidth - container.clientWidth;
+        
+        // 端に達していない時だけ進める
+        if (container.scrollLeft < maxScroll) {
+          container.scrollLeft += 0.5;
+        } else {
         }
       }
       animationRef.current = requestAnimationFrame(animate);
@@ -410,39 +446,120 @@ function CouponUpdateSection({ coupons, shops, isWeb }: { coupons: Coupon[]; sho
   const scroll = (direction: "left" | "right") => {
     const container = scrollRef.current;
     if (!container) return;
-    container.scrollBy({ left: direction === "left" ? -300 : 300, behavior: "smooth" });
+
+    const firstCard = container.querySelector(":first-child") as HTMLElement;
+    if (!firstCard) return;
+
+    const cardWidth = firstCard.getBoundingClientRect().width;
+    const gap = 10;
+
+    const scrollAmount = (cardWidth + gap) * 2;
+
+    const currentScroll = container.scrollLeft;
+    const maxScroll = container.scrollWidth - container.clientWidth;
+
+    if (direction === "right" && currentScroll >= maxScroll - 5) return;
+    if (direction === "left" && currentScroll <= 5) return;
+
+    setIsPaused(true)
+    container.scrollBy({
+      left: direction === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
+
+    setTimeout(() => {
+      setIsPaused(false);
+    }, 500)
   };
 
-  const CouponCard = ({ coupon }: { coupon: typeof coupons[0] }) => {
+  const latestCouponsMap = new Map();
+  const hasOtherCouponsMap = new Map();
+
+  const sortedCoupons = [...coupons].sort((a, b) =>
+    new Date (b.createdAt).getTime() - new Date (a.createdAt).getTime()
+  );
+
+  sortedCoupons.forEach((coupon) => {
+    if(!hasOtherCouponsMap.has(coupon.shopId)) {
+      latestCouponsMap.set(coupon.shopId, coupon);
+      hasOtherCouponsMap.set(coupon.shopId, false);
+    } else {
+      hasOtherCouponsMap.set(coupon.shopId, true)
+    }
+  });
+
+  const displayCoupons = Array.from(latestCouponsMap.values());
+
+  const CouponCard = ({ 
+    coupon, 
+    hasOthers 
+  }: { 
+    coupon: any; 
+    hasOthers?: boolean 
+  }) => {
     const shop = shops.find((s) => s.id === coupon.shopId);
     if (!shop) return null;
+
     return (
       <Card
-        className={`overflow-visible cursor-pointer hover-elevate active-elevate-2 transition-transform ${isWeb ? "w-full" : "flex-shrink-0 w-[160px]"}`}
+        className={`flex-shrink-0 overflow-visible cursor-pointer hover-elevate active-elevate-2 transition-transform ${
+          isWeb ? "w-full" : "w-[160px]"
+        }`}
         onClick={() => navigate(`${basePath}/shop/${shop.id}`)}
         data-testid={`card-coupon-update-${coupon.id}`}
       >
         <div className="relative">
-          <img src={shop.imageUrl} alt={shop.name} className={`w-full object-cover rounded-t-md ${isWeb ? "h-[110px]" : "h-[80px]"}`} loading="lazy" />
+          <img
+            src={shop.imageUrl}
+            alt={shop.name}
+            className={`w-full object-cover rounded-t-md ${isWeb ? "h-[110px]" : "h-[80px]"}`}
+            loading="lazy"
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-t-md" />
           <div className="absolute bottom-1 left-2 right-2">
             <p className="text-white text-[10px] font-bold line-clamp-1">{shop.name}</p>
           </div>
+          
+          {/* クーポンバッジ */}
           <Badge className="absolute top-1 right-1 bg-[#06C755] border-[#06C755] text-white text-[8px] px-1 py-0 gap-0.5">
-            <Ticket className="w-2 h-2" />クーポン
+            <Ticket className="w-2 h-2" /> クーポン
           </Badge>
+
+          {/* その他クーポンありバッジ (アプリ版の横スクロール時などに表示) */}
+          {hasOthers && (
+          <Badge 
+              variant="outline" 
+              className={`
+                absolute text-[8px] px-1 py-0 border-zinc-300 text-zinc-700 bg-zinc-100 shadow-sm
+                ${isWeb 
+                  ? "-top-28 left-24"
+                  : "-top-20 left-12"
+                }
+              `}
+            >
+              その他あり
+            </Badge>
+          )}
         </div>
+
         <div className="p-2">
-          <div className="flex items-center gap-1 mb-0.5">
-            {coupon.isLineAccountCoupon && <Badge className="bg-[#06C755] border-[#06C755] text-white text-[9px] px-1 py-0">LINE限定</Badge>}
-            {coupon.discount && <Badge variant="secondary" className="text-[9px] px-1 py-0 font-bold text-[#06C755]">{coupon.discount}</Badge>}
+          <div className="flex flex-wrap items-center gap-1 mb-1">
+            {coupon.isLineAccountCoupon && (
+              <Badge className="bg-[#06C755] border-[#06C755] text-white text-[9px] px-1 py-0">LINE限定</Badge>
+            )}
+            <Badge variant="secondary" className="text-[9px] px-1 py-0 font-bold text-[#06C755]">
+              {coupon.discount}
+            </Badge>
           </div>
-          <h3 className="font-bold text-xs line-clamp-1" data-testid={`text-coupon-title-${coupon.id}`}>{coupon.title}</h3>
-          {coupon.description && <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{coupon.description}</p>}
+          <h3 className="font-bold text-xs line-clamp-1">{coupon.title}</h3>
+          {coupon.description && (
+            <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{coupon.description}</p>
+          )}
         </div>
       </Card>
     );
   };
+
 
   return (
     <section className="mb-4" data-testid="section-coupon-updates">
@@ -473,21 +590,30 @@ function CouponUpdateSection({ coupons, shops, isWeb }: { coupons: Coupon[]; sho
 
       {isWeb ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {coupons.slice(0, 10).map((coupon) => <CouponCard key={coupon.id} coupon={coupon} />)}
+          {displayCoupons.slice(0, 10).map((coupon) => (
+            <CouponCard 
+              key={coupon.id} 
+              coupon={coupon} 
+              hasOthers={hasOtherCouponsMap.get(coupon.shopId)} 
+            />
+          ))}
         </div>
       ) : (
         <div
           ref={scrollRef}
           className="flex gap-2.5 overflow-x-auto scrollbar-hide px-3 pb-1"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-          onMouseEnter={() => setIsPaused(true)}
-          onMouseLeave={() => setIsPaused(false)}
-          onTouchStart={() => setIsPaused(true)}
-          onTouchEnd={() => setIsPaused(false)}
         >
-          {coupons.map((coupon) => <CouponCard key={coupon.id} coupon={coupon} />)}
+          {displayCoupons.map((coupon) => (
+            <CouponCard 
+              key={coupon.id} 
+              coupon={coupon} 
+              hasOthers={hasOtherCouponsMap.get(coupon.shopId)} 
+            />
+          ))}
         </div>
       )}
+
     </section>
   );
 }
@@ -520,6 +646,7 @@ export default function HomePage() {
   const { data: allCoupons = [] } = useQuery<Coupon[]>({
     queryKey: ["/api/coupons"],
   });
+
 
   const handleSearch = (area: string, category: string, keyword: string) => {
     const params = new URLSearchParams();
@@ -598,13 +725,13 @@ export default function HomePage() {
         ) : (
           <>
             {CATEGORIES.map((cat) => {
-              const catShops = groupedShops[cat.id] || [];
+              const catShops = groupedShops[cat.slug] || [];
               return (
                 <AutoScrollRow
-                  key={cat.id}
+                  key={cat.slug}
                   shops={catShops}
                   title={cat.name}
-                  categoryId={cat.id}
+                  categoryId={cat.slug}
                   isWeb={isWeb}
                 />
               );
