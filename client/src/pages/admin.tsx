@@ -151,6 +151,8 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
     },
   });
 
+  const isLineCouponWithoutUrl = newCouponIsLine && !shop.lineAccountUrl;
+
   return (
     <Card className="overflow-visible p-5 space-y-5">
       <div className="flex items-center justify-between">
@@ -228,12 +230,26 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
           {updateShopMutation.isPending ? "保存中..." : "店舗設定を保存"}
         </Button>
 
-        <Link href={`/admin/shop/${shop.id}`}>
+        {/* <Link href={`/admin/shop/${shop.id}`} target="_blank" rel="noopener noreferrer">
           <Button variant="outline" size="sm" className="gap-1.5" data-testid={`button-shop-manage-${shop.id}`}>
             <ExternalLink className="w-3.5 h-3.5" />
             店舗管理画面を開く
           </Button>
-        </Link>
+        </Link> */}
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="gap-1.5" 
+          data-testid={`button-shop-manage-${shop.id}`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.open(`/admin/shop/${shop.id}`, '_blank', 'noopener,noreferrer');
+          }}
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          店舗管理画面を開く
+        </Button>
       </div>
 
       <div className="border-t pt-4">
@@ -288,6 +304,7 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
             <Plus className="w-3 h-3" />
             新しいクーポンを追加
           </h5>
+          <label className="text-[10px] text-muted-foreground mb-0.5 block">※LINE公式アカウント限定クーポンはLINE公式アカウントURLがない場合、追加できません。</label>
           <div className="space-y-2">
             <Input
               placeholder="クーポンタイトル"
@@ -345,7 +362,7 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
               <Button
                 size="sm"
                 onClick={() => createCouponMutation.mutate()}
-                disabled={!newCouponTitle || createCouponMutation.isPending}
+                disabled={!newCouponTitle || isLineCouponWithoutUrl ||createCouponMutation.isPending}
                 data-testid={`button-add-coupon-${shop.id}`}
               >
                 <Plus className="w-4 h-4 mr-1" />
@@ -425,7 +442,7 @@ function AddShopDialog({ open, onClose }: { open: boolean; onClose: () => void }
                 </SelectTrigger>
                 <SelectContent>
                   {AREAS.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    <SelectItem key={a.slug} value={a.slug}>{a.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -438,7 +455,7 @@ function AddShopDialog({ open, onClose }: { open: boolean; onClose: () => void }
                 </SelectTrigger>
                 <SelectContent>
                   {CATEGORIES.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    <SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
