@@ -380,19 +380,22 @@ export function ensureSetup(): Promise<void> {
         const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({ message: "Invalid shop ID" });
         try {
           const date = req.query.date as string; const courseId = req.query.courseId as string | undefined;
-          const allSlots: string[] = [];
-          for (let h = 10; h <= 19; h++) { allSlots.push(`${String(h).padStart(2,"0")}:00`); if (h < 19) allSlots.push(`${String(h).padStart(2,"0")}:30`); }
-          if (!date) return res.json(allSlots.map(t => ({ time: t, available: true })));
+          let openHour = 10; let closeHour = 19;
           const settingsCnt = await sql`SELECT COUNT(*) as cnt FROM booking_settings WHERE shop_id=${shopId}`;
+          if (parseInt(settingsCnt[0]?.cnt || "0") > 0) { const sr = await sql`SELECT store_open_time, store_close_time FROM booking_settings WHERE shop_id=${shopId}`; if (sr[0]) { const ot = sr[0].store_open_time; const ct = sr[0].store_close_time; openHour = typeof ot === "string" ? parseInt(ot.split(":")[0], 10) : (typeof ot === "number" ? ot : 10); closeHour = typeof ct === "string" ? parseInt(ct.split(":")[0], 10) : (typeof ct === "number" ? ct : 19); } }
+          const allSlots: string[] = [];
+          for (let h = openHour; h < closeHour; h++) { allSlots.push(`${String(h).padStart(2,"0")}:00`); if (h < closeHour - 1 || closeHour - h > 1) allSlots.push(`${String(h).padStart(2,"0")}:30`); }
+          if (!date) return res.json(allSlots.map(t => ({ time: t, available: true })));
           let tableCount = 1;
-          if (parseInt(settingsCnt[0]?.cnt || "0") > 0) { const sr = await sql`SELECT table_count FROM booking_settings WHERE shop_id=${shopId}`; tableCount = Math.max(parseInt(sr[0]?.table_count || "1",10)||1,1); }
+          const tableCountRow = await sql`SELECT table_count FROM booking_settings WHERE shop_id=${shopId}`; 
+          if (tableCountRow.length > 0) { tableCount = Math.max(parseInt(tableCountRow[0]?.table_count || "1",10)||1,1); }
           let courseDuration = 30;
           if (courseId) { const cc = await sql`SELECT COUNT(*) as cnt FROM booking_courses WHERE id=${courseId} AND shop_id=${shopId}`; if (parseInt(cc[0]?.cnt||"0")>0) { const cr = await sql`SELECT duration FROM booking_courses WHERE id=${courseId} AND shop_id=${shopId}`; if (cr[0]) courseDuration = parseInt(cr[0].duration,10)||30; } }
           const slotsNeeded = Math.ceil(courseDuration / 30);
           const reservations = await safeQuery(() => sql`SELECT r.time, COALESCE(c.duration,30) AS duration FROM booking_reservations r LEFT JOIN booking_courses c ON c.id::text = r.course_id AND c.shop_id = r.shop_id WHERE r.shop_id=${shopId} AND r.date=${date} AND r.status != 'cancelled'`);
           const slotCount = new Map<string,number>();
           for (const r of reservations) { const [rh,rm]=(r.time as string).split(":").map(Number); const rStart=rh*60+rm; const rEnd=rStart+(parseInt(r.duration,10)||30); for (const slot of allSlots) { const [sh,sm]=slot.split(":").map(Number); const sStart=sh*60+sm; if (rStart<sStart+30&&rEnd>sStart) slotCount.set(slot,(slotCount.get(slot)||0)+1); } }
-          res.json(allSlots.map(slot => { const [sh,sm]=slot.split(":").map(Number); const sStart=sh*60+sm; if (sStart+courseDuration>19*60) return {time:slot,available:false}; let max=0; for(let i=0;i<slotsNeeded;i++){const cm=sStart+i*30;const cs=`${String(Math.floor(cm/60)).padStart(2,"0")}:${String(cm%60).padStart(2,"0")}`;max=Math.max(max,slotCount.get(cs)||0);} return {time:slot,available:max<tableCount}; }));
+          res.json(allSlots.map(slot => { const [sh,sm]=slot.split(":").map(Number); const sStart=sh*60+sm; if (sStart+courseDuration>closeHour*60) return {time:slot,available:false}; let max=0; for(let i=0;i<slotsNeeded;i++){const cm=sStart+i*30;const cs=`${String(Math.floor(cm/60)).padStart(2,"0")}:${String(cm%60).padStart(2,"0")}`;max=Math.max(max,slotCount.get(cs)||0);} return {time:slot,available:max<tableCount}; }));
         } catch (e: any) { console.error("slots error:", e); res.status(500).json({ message: "Failed to fetch slots" }); }
       });
       app.put("/api/shops/:shopId/slots", async (req, res) => {
@@ -422,16 +425,16 @@ export function ensureSetup(): Promise<void> {
         try {
           await seedShopIfEmpty(shopId);
           const cnt = await sql`SELECT COUNT(*) as cnt FROM booking_settings WHERE shop_id=${shopId}`;
-          if (parseInt(cnt[0]?.cnt||"0")>0) { const rows = await sql`SELECT * FROM booking_settings WHERE shop_id=${shopId}`; const s=rows[0]; return res.json({store_name:s.store_name||"",store_description:s.store_description||"",store_address:s.store_address||"",store_phone:s.store_phone||"",store_email:s.store_email||"",store_hours:s.store_hours||"",store_closed_days:s.store_closed_days||"",banner_url:s.banner_url||"",staff_selection_enabled:s.staff_selection_enabled||"false",table_count:s.table_count!=null?String(s.table_count):"0",max_party_size:s.max_party_size!=null?String(s.max_party_size):"0"}); }
+          if (parseInt(cnt[0]?.cnt||"0")>0) { const rows = await sql`SELECT * FROM booking_settings WHERE shop_id=${shopId}`; const s=rows[0]; return res.json({store_name:s.store_name||"",store_description:s.store_description||"",store_address:s.store_address||"",store_phone:s.store_phone||"",store_email:s.store_email||"",store_hours:s.store_hours||"",store_closed_days:s.store_closed_days||"",banner_url:s.banner_url||"",staff_selection_enabled:s.staff_selection_enabled||"false",table_count:s.table_count!=null?String(s.table_count):"0",max_party_size:s.max_party_size!=null?String(s.max_party_size):"0",store_open_time:s.store_open_time||"10:00",store_close_time:s.store_close_time||"19:00"}); }
           const shopRows = await sql`SELECT * FROM shops WHERE id=${shopId}`; if (!shopRows[0]) return res.status(404).json({message:"Shop not found"});
-          const s=shopRows[0]; res.json({store_name:s.name||"",store_description:s.description||"",store_address:s.address||"",store_phone:s.phone||"",store_email:"",store_hours:s.hours||"",store_closed_days:s.closed_days||"",banner_url:s.image_url||"",staff_selection_enabled:s.enable_staff_assignment?"true":"false"});
+          const s=shopRows[0]; res.json({store_name:s.name||"",store_description:s.description||"",store_address:s.address||"",store_phone:s.phone||"",store_email:"",store_hours:s.hours||"",store_closed_days:s.closed_days||"",banner_url:s.image_url||"",staff_selection_enabled:s.enable_staff_assignment?"true":"false",store_open_time:"10:00",store_close_time:"19:00"});
         } catch (e: any) { console.error("settings error:", e); res.status(500).json({message:"Failed to fetch settings"}); }
       });
       app.put("/api/shops/:shopId/settings", async (req, res) => {
         const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({message:"Invalid shop ID"});
         try {
-          const s=req.body; const tc=parseInt(s.table_count||"0",10)||0; const mp=parseInt(s.max_party_size||"0",10)||0;
-          await sql`INSERT INTO booking_settings (shop_id,store_name,store_description,store_address,store_phone,store_email,store_hours,store_closed_days,banner_url,staff_selection_enabled,table_count,max_party_size,updated_at) VALUES (${shopId},${s.store_name||""},${s.store_description||""},${s.store_address||""},${s.store_phone||""},${s.store_email||""},${s.store_hours||""},${s.store_closed_days||""},${s.banner_url||""},${s.staff_selection_enabled||"false"},${tc},${mp},NOW()) ON CONFLICT (shop_id) DO UPDATE SET store_name=${s.store_name||""},store_description=${s.store_description||""},store_address=${s.store_address||""},store_phone=${s.store_phone||""},store_email=${s.store_email||""},store_hours=${s.store_hours||""},store_closed_days=${s.store_closed_days||""},banner_url=${s.banner_url||""},staff_selection_enabled=${s.staff_selection_enabled||"false"},table_count=${tc},max_party_size=${mp},updated_at=NOW()`;
+          const s=req.body; const tc=parseInt(s.table_count||"0",10)||0; const mp=parseInt(s.max_party_size||"0",10)||0; const ot=s.store_open_time||"10:00"; const ct=s.store_close_time||"19:00";
+          await sql`INSERT INTO booking_settings (shop_id,store_name,store_description,store_address,store_phone,store_email,store_hours,store_closed_days,banner_url,staff_selection_enabled,table_count,max_party_size,store_open_time,store_close_time,updated_at) VALUES (${shopId},${s.store_name||""},${s.store_description||""},${s.store_address||""},${s.store_phone||""},${s.store_email||""},${s.store_hours||""},${s.store_closed_days||""},${s.banner_url||""},${s.staff_selection_enabled||"false"},${tc},${mp},${ot},${ct},NOW()) ON CONFLICT (shop_id) DO UPDATE SET store_name=${s.store_name||""},store_description=${s.store_description||""},store_address=${s.store_address||""},store_phone=${s.store_phone||""},store_email=${s.store_email||""},store_hours=${s.store_hours||""},store_closed_days=${s.store_closed_days||""},banner_url=${s.banner_url||""},staff_selection_enabled=${s.staff_selection_enabled||"false"},table_count=${tc},max_party_size=${mp},store_open_time=${ot},store_close_time=${ct},updated_at=NOW()`;
           res.json(s);
         } catch { res.status(500).json({message:"Failed to update settings"}); }
       });

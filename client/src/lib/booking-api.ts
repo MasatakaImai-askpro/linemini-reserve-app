@@ -67,6 +67,8 @@ export interface StoreSettings {
   staff_selection_enabled: string;
   table_count?: string;
   max_party_size?: string;
+  store_open_time?: string;
+  store_close_time?: string;
 }
 
 export const SHOP_STAFF_ID = "__shop__";
