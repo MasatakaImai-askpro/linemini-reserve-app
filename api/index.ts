@@ -109,6 +109,14 @@ async function getStripePublishableKeyValue(): Promise<string> {
 }
 
 // ─── 型変換ヘルパー ───
+function getAvatarFromName(name: string): string {
+  if (!name) return "";
+  const parts = name.split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0].charAt(0) || "") + (parts[1].charAt(0) || "");
+  }
+  return name.substring(0, 2);
+}
 function toShop(r: any) { return { ...r, galleryImageUrls: r.gallery_image_urls, isActive: r.is_active, enableStaffAssignment: r.enable_staff_assignment, displayOrder: r.display_order, lineAccountUrl: r.line_account_url, imageUrl: r.image_url, reservationUrl: r.reservation_url, reservationImageUrl: r.reservation_image_url, likeCount: r.like_count, stripeConnectId: r.stripe_connect_id, stripeConnectStatus: r.stripe_connect_status, areaId: r.area_id, closedDays: r.closed_days, updatedAt: r.updated_at, createdAt: r.created_at }; }
 function toCoupon(r: any) { return { ...r, shopId: r.shop_id, discountType: r.discount_type, discountValue: r.discount_value, isFirstTimeOnly: r.is_first_time_only, isLineAccountCoupon: r.is_line_account_coupon, isActive: r.is_active, validFrom: r.valid_from, validUntil: r.valid_until, expiryDate: r.expiry_date, createdAt: r.created_at, updatedAt: r.updated_at }; }
 function toCourse(c: any) { return { id: c.id.toString(), name: c.name, category: c.category || "", duration: c.duration || 60, price: c.price || 0, description: c.description || "", prepaymentOnly: c.prepayment_only || false, imageUrl: c.image_url || null, staffIds: (c.staff_ids || []).map((x: any) => x.toString()) }; }
@@ -307,7 +315,8 @@ export function ensureSetup(): Promise<void> {
         const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({ message: "Invalid shop ID" });
         try {
           const { name, role, avatar } = req.body;
-          await sql`INSERT INTO booking_staff (shop_id, name, role, avatar) VALUES (${shopId}, ${name||""}, ${role||""}, ${avatar||""})`;
+          const finalAvatar = avatar || getAvatarFromName(name);
+          await sql`INSERT INTO booking_staff (shop_id, name, role, avatar) VALUES (${shopId}, ${name||""}, ${role||""}, ${finalAvatar})`;
           const maxRow = await sql`SELECT MAX(id) as id FROM booking_staff WHERE shop_id = ${shopId}`;
           const newId = maxRow[0]?.id; if (newId == null) return res.status(500).json({ message: "Failed to create staff" });
           res.status(201).json({ id: String(newId), name: name||"", role: role||"", avatar: avatar||"", courseIds: [] });
@@ -317,7 +326,8 @@ export function ensureSetup(): Promise<void> {
         const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({ message: "Invalid shop ID" });
         try {
           const { id, name, role, avatar } = req.body;
-          await sql`UPDATE booking_staff SET name=${name||""}, role=${role||""}, avatar=${avatar||""} WHERE id=${parseInt(id)} AND shop_id=${shopId}`;
+          const finalAvatar = avatar || getAvatarFromName(name);
+          await sql`UPDATE booking_staff SET name=${name||""}, role=${role||""}, avatar=${finalAvatar} WHERE id=${parseInt(id)} AND shop_id=${shopId}`;
           res.json({ id: id.toString(), name, role, avatar });
         } catch { res.status(500).json({ message: "Failed to update staff" }); }
       });
