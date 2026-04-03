@@ -109,6 +109,14 @@ async function getStripePublishableKeyValue(): Promise<string> {
 }
 
 // ─── 型変換ヘルパー ───
+function getAvatarFromName(name: string): string {
+  if (!name) return "";
+  const parts = name.split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0].charAt(0) || "") + (parts[1].charAt(0) || "");
+  }
+  return name.substring(0, 2);
+}
 function toShop(r: any) { return { ...r, galleryImageUrls: r.gallery_image_urls, isActive: r.is_active, enableStaffAssignment: r.enable_staff_assignment, displayOrder: r.display_order, lineAccountUrl: r.line_account_url, imageUrl: r.image_url, reservationUrl: r.reservation_url, reservationImageUrl: r.reservation_image_url, likeCount: r.like_count, stripeConnectId: r.stripe_connect_id, stripeConnectStatus: r.stripe_connect_status, areaId: r.area_id, closedDays: r.closed_days, updatedAt: r.updated_at, createdAt: r.created_at }; }
 function toCoupon(r: any) { return { ...r, shopId: r.shop_id, discountType: r.discount_type, discountValue: r.discount_value, isFirstTimeOnly: r.is_first_time_only, isLineAccountCoupon: r.is_line_account_coupon, isActive: r.is_active, validFrom: r.valid_from, validUntil: r.valid_until, expiryDate: r.expiry_date, createdAt: r.created_at, updatedAt: r.updated_at }; }
 function toCourse(c: any) { return { id: c.id.toString(), name: c.name, category: c.category || "", duration: c.duration || 60, price: c.price || 0, description: c.description || "", prepaymentOnly: c.prepayment_only || false, imageUrl: c.image_url || null, staffIds: (c.staff_ids || []).map((x: any) => x.toString()) }; }
@@ -307,7 +315,8 @@ export function ensureSetup(): Promise<void> {
         const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({ message: "Invalid shop ID" });
         try {
           const { name, role, avatar } = req.body;
-          await sql`INSERT INTO booking_staff (shop_id, name, role, avatar) VALUES (${shopId}, ${name||""}, ${role||""}, ${avatar||""})`;
+          const finalAvatar = avatar || getAvatarFromName(name);
+          await sql`INSERT INTO booking_staff (shop_id, name, role, avatar) VALUES (${shopId}, ${name||""}, ${role||""}, ${finalAvatar})`;
           const maxRow = await sql`SELECT MAX(id) as id FROM booking_staff WHERE shop_id = ${shopId}`;
           const newId = maxRow[0]?.id; if (newId == null) return res.status(500).json({ message: "Failed to create staff" });
           res.status(201).json({ id: String(newId), name: name||"", role: role||"", avatar: avatar||"", courseIds: [] });
@@ -317,7 +326,8 @@ export function ensureSetup(): Promise<void> {
         const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({ message: "Invalid shop ID" });
         try {
           const { id, name, role, avatar } = req.body;
-          await sql`UPDATE booking_staff SET name=${name||""}, role=${role||""}, avatar=${avatar||""} WHERE id=${parseInt(id)} AND shop_id=${shopId}`;
+          const finalAvatar = avatar || getAvatarFromName(name);
+          await sql`UPDATE booking_staff SET name=${name||""}, role=${role||""}, avatar=${finalAvatar} WHERE id=${parseInt(id)} AND shop_id=${shopId}`;
           res.json({ id: id.toString(), name, role, avatar });
         } catch { res.status(500).json({ message: "Failed to update staff" }); }
       });
@@ -370,23 +380,44 @@ export function ensureSetup(): Promise<void> {
         const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({ message: "Invalid shop ID" });
         try {
           const date = req.query.date as string; const courseId = req.query.courseId as string | undefined;
-          const allSlots: string[] = [];
-          for (let h = 10; h <= 19; h++) { allSlots.push(`${String(h).padStart(2,"0")}:00`); if (h < 19) allSlots.push(`${String(h).padStart(2,"0")}:30`); }
-          if (!date) return res.json(allSlots.map(t => ({ time: t, available: true })));
+          let openHour = 10; let closeHour = 19;
           const settingsCnt = await sql`SELECT COUNT(*) as cnt FROM booking_settings WHERE shop_id=${shopId}`;
+          if (parseInt(settingsCnt[0]?.cnt || "0") > 0) { const sr = await sql`SELECT store_open_time, store_close_time FROM booking_settings WHERE shop_id=${shopId}`; if (sr[0]) { const ot = sr[0].store_open_time; const ct = sr[0].store_close_time; openHour = typeof ot === "string" ? parseInt(ot.split(":")[0], 10) : (typeof ot === "number" ? ot : 10); closeHour = typeof ct === "string" ? parseInt(ct.split(":")[0], 10) : (typeof ct === "number" ? ct : 19); } }
+          const allSlots: string[] = [];
+          for (let h = openHour; h < closeHour; h++) { allSlots.push(`${String(h).padStart(2,"0")}:00`); if (h < closeHour - 1 || closeHour - h > 1) allSlots.push(`${String(h).padStart(2,"0")}:30`); }
+          if (!date) return res.json(allSlots.map(t => ({ time: t, available: true })));
           let tableCount = 1;
-          if (parseInt(settingsCnt[0]?.cnt || "0") > 0) { const sr = await sql`SELECT table_count FROM booking_settings WHERE shop_id=${shopId}`; tableCount = Math.max(parseInt(sr[0]?.table_count || "1",10)||1,1); }
+          const tableCountRow = await sql`SELECT table_count FROM booking_settings WHERE shop_id=${shopId}`; 
+          if (tableCountRow.length > 0) { tableCount = Math.max(parseInt(tableCountRow[0]?.table_count || "1",10)||1,1); }
           let courseDuration = 30;
           if (courseId) { const cc = await sql`SELECT COUNT(*) as cnt FROM booking_courses WHERE id=${courseId} AND shop_id=${shopId}`; if (parseInt(cc[0]?.cnt||"0")>0) { const cr = await sql`SELECT duration FROM booking_courses WHERE id=${courseId} AND shop_id=${shopId}`; if (cr[0]) courseDuration = parseInt(cr[0].duration,10)||30; } }
           const slotsNeeded = Math.ceil(courseDuration / 30);
           const reservations = await safeQuery(() => sql`SELECT r.time, COALESCE(c.duration,30) AS duration FROM booking_reservations r LEFT JOIN booking_courses c ON c.id::text = r.course_id AND c.shop_id = r.shop_id WHERE r.shop_id=${shopId} AND r.date=${date} AND r.status != 'cancelled'`);
           const slotCount = new Map<string,number>();
           for (const r of reservations) { const [rh,rm]=(r.time as string).split(":").map(Number); const rStart=rh*60+rm; const rEnd=rStart+(parseInt(r.duration,10)||30); for (const slot of allSlots) { const [sh,sm]=slot.split(":").map(Number); const sStart=sh*60+sm; if (rStart<sStart+30&&rEnd>sStart) slotCount.set(slot,(slotCount.get(slot)||0)+1); } }
-          res.json(allSlots.map(slot => { const [sh,sm]=slot.split(":").map(Number); const sStart=sh*60+sm; if (sStart+courseDuration>19*60) return {time:slot,available:false}; let max=0; for(let i=0;i<slotsNeeded;i++){const cm=sStart+i*30;const cs=`${String(Math.floor(cm/60)).padStart(2,"0")}:${String(cm%60).padStart(2,"0")}`;max=Math.max(max,slotCount.get(cs)||0);} return {time:slot,available:max<tableCount}; }));
+          res.json(allSlots.map(slot => { const [sh,sm]=slot.split(":").map(Number); const sStart=sh*60+sm; if (sStart+courseDuration>closeHour*60) return {time:slot,available:false}; let max=0; for(let i=0;i<slotsNeeded;i++){const cm=sStart+i*30;const cs=`${String(Math.floor(cm/60)).padStart(2,"0")}:${String(cm%60).padStart(2,"0")}`;max=Math.max(max,slotCount.get(cs)||0);} return {time:slot,available:max<tableCount}; }));
         } catch (e: any) { console.error("slots error:", e); res.status(500).json({ message: "Failed to fetch slots" }); }
       });
-      app.put("/api/shops/:shopId/slots", async (_req, res) => res.json({ ok: true }));
-      app.post("/api/shops/:shopId/slots", async (_req, res) => res.json({ ok: true }));
+      app.put("/api/shops/:shopId/slots", async (req, res) => {
+        const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({ message: "Invalid shop ID" });
+        try {
+          const { staffId, dayOfWeek, time, available } = req.body;
+          if (!staffId || dayOfWeek == null || !time || available == null) return res.status(400).json({ message: "Missing required fields" });
+          await sql`INSERT INTO booking_slots (shop_id, staff_id, day_of_week, time, available, updated_at) VALUES (${shopId}, ${staffId}, ${dayOfWeek}, ${time}, ${available}, NOW()) ON CONFLICT (shop_id, staff_id, day_of_week, time) DO UPDATE SET available=${available}, updated_at=NOW()`;
+          res.json({ ok: true });
+        } catch (e: any) { console.error("slot update error:", e); res.status(500).json({ message: "Failed to update slot" }); }
+      });
+      app.post("/api/shops/:shopId/slots", async (req, res) => {
+        const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({ message: "Invalid shop ID" });
+        try {
+          const { staffId, dayOfWeek, times, available } = req.body;
+          if (!staffId || dayOfWeek == null || !Array.isArray(times) || available == null) return res.status(400).json({ message: "Missing required fields" });
+          for (const time of times) {
+            await sql`INSERT INTO booking_slots (shop_id, staff_id, day_of_week, time, available, updated_at) VALUES (${shopId}, ${staffId}, ${dayOfWeek}, ${time}, ${available}, NOW()) ON CONFLICT (shop_id, staff_id, day_of_week, time) DO UPDATE SET available=${available}, updated_at=NOW()`;
+          }
+          res.json({ ok: true });
+        } catch (e: any) { console.error("bulk slot update error:", e); res.status(500).json({ message: "Failed to bulk update slots" }); }
+      });
 
       // ─── 設定 ───
       app.get("/api/shops/:shopId/settings", async (req, res) => {
@@ -394,16 +425,16 @@ export function ensureSetup(): Promise<void> {
         try {
           await seedShopIfEmpty(shopId);
           const cnt = await sql`SELECT COUNT(*) as cnt FROM booking_settings WHERE shop_id=${shopId}`;
-          if (parseInt(cnt[0]?.cnt||"0")>0) { const rows = await sql`SELECT * FROM booking_settings WHERE shop_id=${shopId}`; const s=rows[0]; return res.json({store_name:s.store_name||"",store_description:s.store_description||"",store_address:s.store_address||"",store_phone:s.store_phone||"",store_email:s.store_email||"",store_hours:s.store_hours||"",store_closed_days:s.store_closed_days||"",banner_url:s.banner_url||"",staff_selection_enabled:s.staff_selection_enabled||"false",table_count:s.table_count!=null?String(s.table_count):"0",max_party_size:s.max_party_size!=null?String(s.max_party_size):"0"}); }
+          if (parseInt(cnt[0]?.cnt||"0")>0) { const rows = await sql`SELECT * FROM booking_settings WHERE shop_id=${shopId}`; const s=rows[0]; return res.json({store_name:s.store_name||"",store_description:s.store_description||"",store_address:s.store_address||"",store_phone:s.store_phone||"",store_email:s.store_email||"",store_hours:s.store_hours||"",store_closed_days:s.store_closed_days||"",banner_url:s.banner_url||"",staff_selection_enabled:s.staff_selection_enabled||"false",table_count:s.table_count!=null?String(s.table_count):"0",max_party_size:s.max_party_size!=null?String(s.max_party_size):"0",store_open_time:s.store_open_time||"10:00",store_close_time:s.store_close_time||"19:00"}); }
           const shopRows = await sql`SELECT * FROM shops WHERE id=${shopId}`; if (!shopRows[0]) return res.status(404).json({message:"Shop not found"});
-          const s=shopRows[0]; res.json({store_name:s.name||"",store_description:s.description||"",store_address:s.address||"",store_phone:s.phone||"",store_email:"",store_hours:s.hours||"",store_closed_days:s.closed_days||"",banner_url:s.image_url||"",staff_selection_enabled:s.enable_staff_assignment?"true":"false"});
+          const s=shopRows[0]; res.json({store_name:s.name||"",store_description:s.description||"",store_address:s.address||"",store_phone:s.phone||"",store_email:"",store_hours:s.hours||"",store_closed_days:s.closed_days||"",banner_url:s.image_url||"",staff_selection_enabled:s.enable_staff_assignment?"true":"false",store_open_time:"10:00",store_close_time:"19:00"});
         } catch (e: any) { console.error("settings error:", e); res.status(500).json({message:"Failed to fetch settings"}); }
       });
       app.put("/api/shops/:shopId/settings", async (req, res) => {
         const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({message:"Invalid shop ID"});
         try {
-          const s=req.body; const tc=parseInt(s.table_count||"0",10)||0; const mp=parseInt(s.max_party_size||"0",10)||0;
-          await sql`INSERT INTO booking_settings (shop_id,store_name,store_description,store_address,store_phone,store_email,store_hours,store_closed_days,banner_url,staff_selection_enabled,table_count,max_party_size,updated_at) VALUES (${shopId},${s.store_name||""},${s.store_description||""},${s.store_address||""},${s.store_phone||""},${s.store_email||""},${s.store_hours||""},${s.store_closed_days||""},${s.banner_url||""},${s.staff_selection_enabled||"false"},${tc},${mp},NOW()) ON CONFLICT (shop_id) DO UPDATE SET store_name=${s.store_name||""},store_description=${s.store_description||""},store_address=${s.store_address||""},store_phone=${s.store_phone||""},store_email=${s.store_email||""},store_hours=${s.store_hours||""},store_closed_days=${s.store_closed_days||""},banner_url=${s.banner_url||""},staff_selection_enabled=${s.staff_selection_enabled||"false"},table_count=${tc},max_party_size=${mp},updated_at=NOW()`;
+          const s=req.body; const tc=parseInt(s.table_count||"0",10)||0; const mp=parseInt(s.max_party_size||"0",10)||0; const ot=s.store_open_time||"10:00"; const ct=s.store_close_time||"19:00";
+          await sql`INSERT INTO booking_settings (shop_id,store_name,store_description,store_address,store_phone,store_email,store_hours,store_closed_days,banner_url,staff_selection_enabled,table_count,max_party_size,store_open_time,store_close_time,updated_at) VALUES (${shopId},${s.store_name||""},${s.store_description||""},${s.store_address||""},${s.store_phone||""},${s.store_email||""},${s.store_hours||""},${s.store_closed_days||""},${s.banner_url||""},${s.staff_selection_enabled||"false"},${tc},${mp},${ot},${ct},NOW()) ON CONFLICT (shop_id) DO UPDATE SET store_name=${s.store_name||""},store_description=${s.store_description||""},store_address=${s.store_address||""},store_phone=${s.store_phone||""},store_email=${s.store_email||""},store_hours=${s.store_hours||""},store_closed_days=${s.store_closed_days||""},banner_url=${s.banner_url||""},staff_selection_enabled=${s.staff_selection_enabled||"false"},table_count=${tc},max_party_size=${mp},store_open_time=${ot},store_close_time=${ct},updated_at=NOW()`;
           res.json(s);
         } catch { res.status(500).json({message:"Failed to update settings"}); }
       });
@@ -419,6 +450,16 @@ export function ensureSetup(): Promise<void> {
         try {
           const {customerName,customerPhone,customerEmail,date,time,staffId,courseId}=req.body;
           if (!customerName||!date||!time||!courseId) return res.status(400).json({message:"Missing required fields"});
+          const shopRows = await sql`SELECT enable_staff_assignment FROM shops WHERE id = ${shopId}`;
+          const enableStaffAssignment = shopRows[0]?.enable_staff_assignment || false;
+          if (enableStaffAssignment && !staffId) return res.status(400).json({message:"Staff selection is required"});
+          if (staffId) {
+            const dayOfWeek = new Date(date).getDay();
+            const slotRows = await sql`SELECT available FROM booking_slots WHERE shop_id = ${shopId} AND staff_id = ${staffId} AND day_of_week = ${dayOfWeek} AND time = ${time}`;
+            if (slotRows.length > 0 && !slotRows[0].available) return res.status(400).json({message:"Selected time slot is not available"});
+          }
+          const existing = await sql`SELECT COUNT(*) as cnt FROM booking_reservations WHERE shop_id = ${shopId} AND date = ${date} AND time = ${time} AND status != 'cancelled'`;
+          if (parseInt(existing[0]?.cnt || "0") > 0) return res.status(400).json({message:"Time slot already booked"});
           const token=crypto.randomUUID().replace(/-/g,"");
           await sql`INSERT INTO booking_reservations (shop_id,customer_name,customer_phone,customer_email,date,time,staff_id,course_id,status,paid,cancel_token) VALUES (${shopId},${customerName},${customerPhone||null},${customerEmail||null},${date},${time},${staffId||"__shop__"},${courseId.toString()},'confirmed',false,${token})`;
           const rows=await sql`SELECT * FROM booking_reservations WHERE cancel_token = ${token}`;
@@ -431,13 +472,13 @@ export function ensureSetup(): Promise<void> {
         try {
           const {id,status,paid,customerName,customerPhone,customerEmail,date,time}=req.body;
           const resId=parseInt(id); if (isNaN(resId)) return res.status(400).json({message:"Invalid reservation ID"});
-          if (status!==undefined) await sql`UPDATE booking_reservations SET status=${status} WHERE id=${resId} AND shop_id=${shopId}`;
-          if (paid!==undefined) await sql`UPDATE booking_reservations SET paid=${paid} WHERE id=${resId} AND shop_id=${shopId}`;
-          if (customerName!==undefined) await sql`UPDATE booking_reservations SET customer_name=${customerName} WHERE id=${resId} AND shop_id=${shopId}`;
-          if (customerPhone!==undefined) await sql`UPDATE booking_reservations SET customer_phone=${customerPhone} WHERE id=${resId} AND shop_id=${shopId}`;
-          if (customerEmail!==undefined) await sql`UPDATE booking_reservations SET customer_email=${customerEmail} WHERE id=${resId} AND shop_id=${shopId}`;
-          if (date!==undefined) await sql`UPDATE booking_reservations SET date=${date} WHERE id=${resId} AND shop_id=${shopId}`;
-          if (time!==undefined) await sql`UPDATE booking_reservations SET time=${time} WHERE id=${resId} AND shop_id=${shopId}`;
+          if (status!==undefined) await sql`UPDATE booking_reservations SET status=${status}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
+          if (paid!==undefined) await sql`UPDATE booking_reservations SET paid=${paid}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
+          if (customerName!==undefined) await sql`UPDATE booking_reservations SET customer_name=${customerName}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
+          if (customerPhone!==undefined) await sql`UPDATE booking_reservations SET customer_phone=${customerPhone}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
+          if (customerEmail!==undefined) await sql`UPDATE booking_reservations SET customer_email=${customerEmail}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
+          if (date!==undefined) await sql`UPDATE booking_reservations SET date=${date}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
+          if (time!==undefined) await sql`UPDATE booking_reservations SET time=${time}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
           const rows=await sql`SELECT * FROM booking_reservations WHERE id=${resId} AND shop_id=${shopId}`;
           if (!rows[0]) return res.status(404).json({message:"Reservation not found"});
           res.json(toReservation(rows[0]));

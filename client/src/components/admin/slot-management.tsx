@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Check, X, Loader2 } from "lucide-react";
 import { fetchStaff, fetchSlots, fetchSettings, bulkUpdateSlots, updateSlot, SHOP_STAFF_ID, type Staff } from "@/lib/booking-api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -29,6 +31,10 @@ export function SlotManagement({ shopId }: { shopId: number }) {
   const [selectedStaff, setSelectedStaff] = useState<string>("");
   const [slotStates, setSlotStates] = useState<SlotState>({});
   const [staffEnabled, setStaffEnabled] = useState(true);
+  const [storeOpenTime, setStoreOpenTime] = useState("10:00");
+  const [storeCloseTime, setStoreCloseTime] = useState("19:00");
+  const [timesToDisplay, setTimesToDisplay] = useState(TIMES);
+  const [saveLoading, setSaveLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -36,6 +42,18 @@ export function SlotManagement({ shopId }: { shopId: number }) {
       setStaffList(s);
       const enabled = settings.staff_selection_enabled === "true";
       setStaffEnabled(enabled);
+      const ot = settings.store_open_time || "10:00";
+      const ct = settings.store_close_time || "19:00";
+      setStoreOpenTime(ot);
+      setStoreCloseTime(ct);
+      const times: string[] = [];
+      const [oh] = ot.split(":").map(Number);
+      const [ch] = ct.split(":").map(Number);
+      for (let h = oh; h < ch; h++) {
+        times.push(`${String(h).padStart(2, "0")}:00`);
+        if (h < ch - 1) times.push(`${String(h).padStart(2, "0")}:30`);
+      }
+      setTimesToDisplay(times);
       if (enabled && s.length > 0) {
         setSelectedStaff(s[0].id);
       } else if (!enabled) {
@@ -72,13 +90,39 @@ export function SlotManagement({ shopId }: { shopId: number }) {
 
   const toggleDayAll = async (dayIndex: number) => {
     const dayOfWeek = weekDays[dayIndex].getDay();
-    const allOpen = TIMES.every((time) => slotStates[`${selectedStaff}-${dayOfWeek}-${time}`] ?? true);
+    const allOpen = timesToDisplay.every((time) => slotStates[`${selectedStaff}-${dayOfWeek}-${time}`] ?? true);
     const newStates = { ...slotStates };
-    TIMES.forEach((time) => {
+    timesToDisplay.forEach((time) => {
       newStates[`${selectedStaff}-${dayOfWeek}-${time}`] = !allOpen;
     });
     setSlotStates(newStates);
-    await bulkUpdateSlots(shopId, selectedStaff, dayOfWeek, TIMES, !allOpen);
+    await bulkUpdateSlots(shopId, selectedStaff, dayOfWeek, timesToDisplay, !allOpen);
+  };
+
+  const saveBusinessHours = async () => {
+    setSaveLoading(true);
+    try {
+      const response = await fetch(`/api/shops/${shopId}/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          store_open_time: storeOpenTime,
+          store_close_time: storeCloseTime,
+        }),
+      });
+      if (response.ok) {
+        const times: string[] = [];
+        const [oh] = storeOpenTime.split(":").map(Number);
+        const [ch] = storeCloseTime.split(":").map(Number);
+        for (let h = oh; h < ch; h++) {
+          times.push(`${String(h).padStart(2, "0")}:00`);
+          if (h < ch - 1) times.push(`${String(h).padStart(2, "0")}:30`);
+        }
+        setTimesToDisplay(times);
+      }
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
   if (loading) {
@@ -129,6 +173,47 @@ export function SlotManagement({ shopId }: { shopId: number }) {
         </div>
       </div>
 
+      <div className="mb-6 rounded-lg border border-border bg-card p-4">
+        <h3 className="text-sm font-semibold text-foreground mb-3">営業時間設定</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="open-time" className="text-sm text-foreground">開店時間</Label>
+            <Input
+              id="open-time"
+              type="time"
+              value={storeOpenTime}
+              onChange={(e) => setStoreOpenTime(e.target.value)}
+              className="text-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="close-time" className="text-sm text-foreground">閉店時間</Label>
+            <Input
+              id="close-time"
+              type="time"
+              value={storeCloseTime}
+              onChange={(e) => setStoreCloseTime(e.target.value)}
+              className="text-sm"
+            />
+          </div>
+        </div>
+        <Button
+          onClick={saveBusinessHours}
+          disabled={saveLoading}
+          className="mt-4 w-full md:w-auto"
+          data-testid="button-save-business-hours"
+        >
+          {saveLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              保存中...
+            </>
+          ) : (
+            "営業時間を保存"
+          )}
+        </Button>
+      </div>
+
       <div className="mb-3 flex items-center gap-4">
         <div className="flex items-center gap-1.5">
           <div className="h-4 w-4 rounded-sm bg-[#06C755]" />
@@ -170,7 +255,7 @@ export function SlotManagement({ shopId }: { shopId: number }) {
             </tr>
           </thead>
           <tbody>
-            {TIMES.map((time) => (
+            {timesToDisplay.map((time) => (
               <tr key={time} className="border-b border-border last:border-0">
                 <td className="sticky left-0 z-10 bg-card px-3 py-0.5 text-xs text-muted-foreground font-mono">
                   {time}

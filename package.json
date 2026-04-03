@@ -8,6 +8,8 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
+    "lint:types": "tsc --noEmit",
+    "verify": "npm run lint:types && npm run build",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
