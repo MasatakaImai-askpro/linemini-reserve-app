@@ -15,11 +15,8 @@ export function log(message: string, source = "express") {
 }
 
 (async () => {
-  const { runMigrations } = await import("./migrate");
-  await runMigrations();
-
-  const { seedDatabase } = await import("./seed");
-  await seedDatabase();
+  const {ensureSetup} = await import("../api/index");
+  await ensureSetup();
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -37,8 +34,8 @@ export function log(message: string, source = "express") {
     await setupVite(httpServer, app);
   }
 
-  const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
+  const port = parseInt(process.env.PORT || "5001", 10);
+  httpServer.listen(port, () => {
     log(`serving on port ${port}`);
   });
 })();

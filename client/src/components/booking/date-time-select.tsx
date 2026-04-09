@@ -56,8 +56,10 @@ export function DateTimeSelect({ shopId, course, staff, onSelect }: DateTimeSele
     const dateStr = format(selectedDate, "yyyy-MM-dd");
     setLoadingSlots(true);
     fetchSlots(shopId, staffId, dateStr, course.id).then((slots) => {
+      console.log("Fetched slots:", slots);
       setTimeSlots(slots);
-    }).catch(() => {
+    }).catch((error) => {
+      console.error("Failed to fetch slots:", error);
       setTimeSlots([]);
     }).finally(() => {
       setLoadingSlots(false);
@@ -171,6 +173,7 @@ export function DateTimeSelect({ shopId, course, staff, onSelect }: DateTimeSele
             </div>
           ) : (
             <div className="grid grid-cols-4 gap-2 bg-card p-4">
+              {timeSlots.length === 0 && <div className="text-xs text-muted-foreground">スロット情報がありません</div>}
               {timeSlots.map((slot) => (
                 <button
                   key={slot.time}
@@ -182,6 +185,7 @@ export function DateTimeSelect({ shopId, course, staff, onSelect }: DateTimeSele
                       : "border-border bg-muted text-muted-foreground/40 line-through"
                   }`}
                   data-testid={`time-slot-${slot.time}`}
+                  title={`Time: ${slot.time}, Available: ${slot.available}`}
                 >
                   {slot.time}
                 </button>
