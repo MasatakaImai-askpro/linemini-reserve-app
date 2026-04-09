@@ -8,6 +8,9 @@ import bcrypt from "bcryptjs";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { Pool } from "pg";
+import dotenv from "dotenv";
+dotenv.config();
 
 // ─── Express app ───
 export const app = express();
@@ -15,8 +18,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 export const httpServer = createServer(app);
 
+// ローカル用
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+  });
 // ─── DB接続 ───
-const sql = neon(process.env.DATABASE_URL!);
+// const sql = neon(process.env.DATABASE_URL!);
+
+const sql = async (strings: TemplateStringsArray, ...values: any[]) => {
+  const query = strings.reduce((acc, str, i) => acc + str + (values[i] !== undefined ? `$${i + 1}` : ""), "");
+  const res = await pool.query(query, values);
+  return res.rows;
+};
+
 
 // ─── ファイルアップロード ───
 // Vercel は読み取り専用FSのため /tmp を使用
@@ -380,23 +394,85 @@ export function ensureSetup(): Promise<void> {
         const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({ message: "Invalid shop ID" });
         try {
           const date = req.query.date as string; const courseId = req.query.courseId as string | undefined;
+          console.log("slots request - shopId:", shopId, "date:", date, "courseId:", courseId);
+          
+          // Validate date format
+          if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({ message: "Invalid date format. Expected YYYY-MM-DD" });
+          }
+          
           let openHour = 10; let closeHour = 19;
           const settingsCnt = await sql`SELECT COUNT(*) as cnt FROM booking_settings WHERE shop_id=${shopId}`;
           if (parseInt(settingsCnt[0]?.cnt || "0") > 0) { const sr = await sql`SELECT store_open_time, store_close_time FROM booking_settings WHERE shop_id=${shopId}`; if (sr[0]) { const ot = sr[0].store_open_time; const ct = sr[0].store_close_time; openHour = typeof ot === "string" ? parseInt(ot.split(":")[0], 10) : (typeof ot === "number" ? ot : 10); closeHour = typeof ct === "string" ? parseInt(ct.split(":")[0], 10) : (typeof ct === "number" ? ct : 19); } }
           const allSlots: string[] = [];
           for (let h = openHour; h < closeHour; h++) { allSlots.push(`${String(h).padStart(2,"0")}:00`); if (h < closeHour - 1 || closeHour - h > 1) allSlots.push(`${String(h).padStart(2,"0")}:30`); }
+          console.log("allSlots:", allSlots);
           if (!date) return res.json(allSlots.map(t => ({ time: t, available: true })));
+          
           let tableCount = 1;
           const tableCountRow = await sql`SELECT table_count FROM booking_settings WHERE shop_id=${shopId}`; 
           if (tableCountRow.length > 0) { tableCount = Math.max(parseInt(tableCountRow[0]?.table_count || "1",10)||1,1); }
+          
           let courseDuration = 30;
-          if (courseId) { const cc = await sql`SELECT COUNT(*) as cnt FROM booking_courses WHERE id=${courseId} AND shop_id=${shopId}`; if (parseInt(cc[0]?.cnt||"0")>0) { const cr = await sql`SELECT duration FROM booking_courses WHERE id=${courseId} AND shop_id=${shopId}`; if (cr[0]) courseDuration = parseInt(cr[0].duration,10)||30; } }
+          if (courseId) { 
+            try {
+              const cc = await sql`SELECT COUNT(*) as cnt FROM booking_courses WHERE id=${parseInt(courseId, 10)} AND shop_id=${shopId}`;
+              if (parseInt(cc[0]?.cnt||"0")>0) { 
+                const cr = await sql`SELECT duration FROM booking_courses WHERE id=${parseInt(courseId, 10)} AND shop_id=${shopId}`;
+                if (cr[0]) courseDuration = parseInt(cr[0].duration,10)||30;
+              }
+            } catch (ce) {
+              console.warn("Course lookup failed:", ce);
+            }
+          }
+          
           const slotsNeeded = Math.ceil(courseDuration / 30);
-          const reservations = await safeQuery(() => sql`SELECT r.time, COALESCE(c.duration,30) AS duration FROM booking_reservations r LEFT JOIN booking_courses c ON c.id::text = r.course_id AND c.shop_id = r.shop_id WHERE r.shop_id=${shopId} AND r.date=${date} AND r.status != 'cancelled'`);
+          
+          let reservations: any[] = [];
+          try {
+            reservations = await safeQuery(() => sql`SELECT r.time, COALESCE(c.duration,30) AS duration FROM booking_reservations r LEFT JOIN booking_courses c ON r.course_id = c.id AND c.shop_id = r.shop_id WHERE r.shop_id=${shopId} AND r.date=${date} AND r.status != 'cancelled'`);
+            console.log("reservations fetched:", reservations.length, "items");
+          } catch (rte) {
+            console.error("Reservations query error:", rte);
+            throw rte;
+          }
+          
           const slotCount = new Map<string,number>();
-          for (const r of reservations) { const [rh,rm]=(r.time as string).split(":").map(Number); const rStart=rh*60+rm; const rEnd=rStart+(parseInt(r.duration,10)||30); for (const slot of allSlots) { const [sh,sm]=slot.split(":").map(Number); const sStart=sh*60+sm; if (rStart<sStart+30&&rEnd>sStart) slotCount.set(slot,(slotCount.get(slot)||0)+1); } }
-          res.json(allSlots.map(slot => { const [sh,sm]=slot.split(":").map(Number); const sStart=sh*60+sm; if (sStart+courseDuration>closeHour*60) return {time:slot,available:false}; let max=0; for(let i=0;i<slotsNeeded;i++){const cm=sStart+i*30;const cs=`${String(Math.floor(cm/60)).padStart(2,"0")}:${String(cm%60).padStart(2,"0")}`;max=Math.max(max,slotCount.get(cs)||0);} return {time:slot,available:max<tableCount}; }));
-        } catch (e: any) { console.error("slots error:", e); res.status(500).json({ message: "Failed to fetch slots" }); }
+          for (const r of reservations) { 
+            if (!r.time) continue;
+            try {
+              const [rh,rm]=(r.time as string).split(":").map(Number);
+              const rStart=rh*60+rm;
+              const durationVal = typeof r.duration === 'number' ? r.duration : parseInt(r.duration,10)||30;
+              const rEnd=rStart+durationVal;
+              for (const slot of allSlots) {
+                const [sh,sm]=slot.split(":").map(Number);
+                const sStart=sh*60+sm;
+                if (rStart<sStart+30&&rEnd>sStart) slotCount.set(slot,(slotCount.get(slot)||0)+1);
+              }
+            } catch (pe) {
+              console.warn("Error processing reservation:", r, pe);
+            }
+          }
+          
+          const result = allSlots.map(slot => { 
+            const [sh,sm]=slot.split(":").map(Number);
+            const sStart=sh*60+sm;
+            if (sStart+courseDuration>closeHour*60) return {time:slot,available:false};
+            let max=0;
+            for(let i=0;i<slotsNeeded;i++){
+              const cm=sStart+i*30;
+              const cs=`${String(Math.floor(cm/60)).padStart(2,"0")}:${String(cm%60).padStart(2,"0")}`;
+              max=Math.max(max,slotCount.get(cs)||0);
+            }
+            return {time:slot,available:max<tableCount};
+          });
+          console.log("returning slots result:", result);
+          res.json(result);
+        } catch (e: any) { 
+          console.error("slots error:", e.message, e); 
+          res.status(500).json({ message: "Failed to fetch slots", error: e.message }); 
+        }
       });
       app.put("/api/shops/:shopId/slots", async (req, res) => {
         const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({ message: "Invalid shop ID" });
@@ -627,13 +703,6 @@ export function ensureSetup(): Promise<void> {
 
 // Vercel serverless handler
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  try {
-    await ensureSetup();
-    return app(req as any, res as any);
-  } catch (err: any) {
-    console.error("[Vercel] Handler error:", err.message, err.stack);
-    if (!res.headersSent) {
-      res.status(500).json({ message: err.message || "Internal server error" });
-    }
-  }
+  await ensureSetup();
+  return app(req as any, res as any);
 }
