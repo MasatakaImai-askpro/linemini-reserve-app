@@ -93,7 +93,7 @@ export const shops = pgTable("shops", {
   likeCount:             integer("like_count").notNull().default(0),
   stripeConnectId:       text("stripe_connect_id"),
   stripeConnectStatus:   text("stripe_connect_status").default("none"),
-  tableCount:            integer("table_count"),
+  tableCount:            integer("table_count").default(0),
   maxPartySize:          integer("max_party_size"),
   staffSelectionEnabled: boolean("staff_selection_enabled").notNull().default(false),
   updatedAt:             timestamp("updated_at").notNull().defaultNow(),
@@ -200,8 +200,23 @@ export const bookingSettings = pgTable("booking_settings", {
   staffSelectionEnabled: text("staff_selection_enabled").default("false"),
   tableCount:           integer("table_count").default(0),
   maxPartySize:         integer("max_party_size").default(0),
+  storeOpenTime:        text("store_open_time").default("10:00"),
+  storeCloseTime:       text("store_close_time").default("19:00"),
+  createdAt:           timestamp("created_at").defaultNow(),
   updatedAt:            timestamp("updated_at").defaultNow(),
 });
+
+export const bookingSlots = pgTable("booking_slots", {
+  id:         serial("id").primaryKey(),
+  shopId:     integer("shop_id").notNull(),
+  staffId:    text("staff_id").notNull(),
+  dayOfWeek:  integer("day_of_week").notNull(),
+  time:       text("time").notNull(),
+  available:  boolean("available").notNull().default(true),
+  updatedAt:  timestamp("updated_at").defaultNow(),
+}, (t) => [
+  uniqueIndex("booking_slots_idx").on(t.shopId, t.staffId, t.dayOfWeek, t.time),
+]);
 
 // ─────────────────────────────
 // Zodスキーマ（自動生成）

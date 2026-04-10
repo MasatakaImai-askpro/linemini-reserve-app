@@ -8,6 +8,13 @@
       "when": 1775188279279,
       "tag": "0000_boring_meteorite",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775793391284,
+      "tag": "0001_neat_kylun",
+      "breakpoints": true
     }
   ]
 }
