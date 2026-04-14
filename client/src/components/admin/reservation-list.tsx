@@ -132,6 +132,7 @@ export function ReservationList({ shopId }: { shopId: number }) {
               <TableHead>予約日時</TableHead>
               <TableHead>お客様名</TableHead>
               <TableHead>コース</TableHead>
+              <TableHead>人数</TableHead>
               <TableHead>担当者</TableHead>
               <TableHead className="text-right">料金</TableHead>
               <TableHead className="text-center">決済</TableHead>
@@ -166,6 +167,7 @@ export function ReservationList({ shopId }: { shopId: number }) {
                     {res.customerPhone && <div className="text-[10px] text-muted-foreground">{res.customerPhone}</div>}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{course?.name || "-"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{res.customerCount || "-"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{staff?.name || "-"}</TableCell>
                   <TableCell className="text-right font-medium text-foreground">
                     {course ? formatPrice(course.price) : "-"}
