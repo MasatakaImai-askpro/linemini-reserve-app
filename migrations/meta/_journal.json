@@ -19,22 +19,8 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1776064477138,
-      "tag": "0002_right_harpoon",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1776072165686,
-      "tag": "0003_oval_satana",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1776147371570,
-      "tag": "0003_shop_menu_items",
+      "when": 1776218730831,
+      "tag": "0002_dashing_the_fury",
       "breakpoints": true
     }
   ]
