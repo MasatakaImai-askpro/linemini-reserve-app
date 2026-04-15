@@ -11,7 +11,6 @@ interface CourseSelectProps {
   stripeConnectId?: string | null;
   stripeConnectStatus?: string | null;
   onSelect: (course: Course) => void;
-  bookingMode?: "normal" | "request";
 }
 
 type MenuItem = {
@@ -26,7 +25,7 @@ type MenuItem = {
 
   type Tab = "courses" | "menu" | "store-info";
 
-export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onSelect, bookingMode = "normal" }: CourseSelectProps) {
+export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onSelect}: CourseSelectProps) {
   const stripeActive = !!(stripeConnectId && stripeConnectStatus === "active");
   const [activeTab, setActiveTab] = useState<Tab>("courses");
   const [courses, setCourses] = useState<Course[]>([]);
@@ -69,13 +68,6 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
     setSent(true);
   };
 
-  const displayCourses = courses.filter((c) => {
-      if (bookingMode === "request") {
-        return c.enableRequestMode === true;
-      }
-      return true;
-    });
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -83,9 +75,6 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
       </div>
     );
   }
-
-  // 削除予定
-  const categories = [...new Set(courses.map((c) => c.category))];
 
   return (
     <div className="flex flex-col" data-testid="booking-course-select">
@@ -128,7 +117,7 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
         </button>
       </div>
 
-      {activeTab === "courses" && (
+      {/* {activeTab === "courses" && (
         <>
           {!stripeActive && courses.some((c) => c.prepaymentOnly) && (
             <div className="mx-4 mt-3 mb-1 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
@@ -144,7 +133,7 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
                 <h2 className="text-sm font-bold text-foreground">{category}</h2>
               </div>
               <div className="flex flex-col divide-y divide-border">
-                {displayCourses.filter((c) => c.category === category).map((course) => {
+                {courses.filter((c) => c.category === category).map((course) => {
                   const disabled = course.prepaymentOnly && !stripeActive;
                   return (
                     <button
@@ -195,6 +184,72 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
               </div>
             </div>
           ))}
+        </>
+      )} */}
+
+      {activeTab === "courses" && (
+        <>
+          {/* Stripe未設定時の警告ボックス（ロジックは維持） */}
+          {!stripeActive && courses.some((c) => c.prepaymentOnly) && (
+            <div className="mx-4 mt-3 mb-1 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <p className="text-xs text-amber-800 leading-relaxed">
+                「事前決済」マークのコースはオンライン決済の設定が完了していないため、現在ご予約いただけません。
+              </p>
+            </div>
+          )}
+
+          {/* コースを直接ループして表示 */}
+          <div className="flex flex-col divide-y divide-border">
+            {courses.map((course) => {
+              const disabled = course.prepaymentOnly && !stripeActive;
+              return (
+                <button
+                  key={course.id}
+                  onClick={() => !disabled && onSelect(course)}
+                  disabled={disabled}
+                  className={`flex items-start gap-3 px-4 py-4 text-left transition-colors ${
+                    disabled
+                      ? "bg-muted/30 opacity-50 cursor-not-allowed"
+                      : "bg-card hover:bg-muted/50 active:bg-muted"
+                  }`}
+                  data-testid={`course-item-${course.id}`}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-foreground">{course.name}</h3>
+                      {course.prepaymentOnly && (
+                        <Badge
+                          variant="secondary"
+                          className={`gap-1 text-[10px] px-1.5 py-0 ${
+                            stripeActive
+                              ? "bg-primary/10 text-primary"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          <CreditCard className="h-2.5 w-2.5" />
+                          事前決済
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-2">
+                      {course.description}
+                    </p>
+                    <div className="mt-2 flex items-center gap-3">
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {formatDuration(course.duration)}
+                      </span>
+                      <span className="text-base font-bold text-primary">
+                        {formatPrice(course.price)}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+              );
+            })}
+          </div>
         </>
       )}
 

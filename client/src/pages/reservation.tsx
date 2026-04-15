@@ -16,7 +16,6 @@ import { BookingComplete } from "@/components/booking/booking-complete";
 import { createReservation, fetchSettings, SHOP_STAFF_ID, type Course, type Staff } from "@/lib/booking-api";
 
 type Step = "course" | "course-detail" | "staff" | "datetime" | "confirm" | "complete";
-type BookingMode = "normal" | "request";
 
 const STEP_TITLES: Record<Step, string> = {
   course: "コース一覧",
@@ -32,14 +31,11 @@ export default function ReservationPage() {
   const shopId = parseInt(params.id || "0");
   const [, navigate] = useLocation();
   const basePath = useBasePath();
-  const searchParams = new URLSearchParams(window.location.search);
-  const initialMode = searchParams.get("mode") === "request" ? "request" : "normal";
 
   const { data: shop, isLoading } = useQuery<Shop>({
     queryKey: ["/api/shops", params.id],
   });
 
-  const [bookingMode, setBookingMode] = useState<BookingMode>(initialMode);
   const [step, setStep] = useState<Step>("course");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
@@ -80,7 +76,11 @@ export default function ReservationPage() {
         setStep(staffSelectionEnabled ? "staff" : "course-detail");
         break;
       case "confirm":
-        setStep("datetime");
+        if (selectedCourse?.enableRequestMode) {
+          setStep("course-detail");
+        } else {
+          setStep("datetime");
+        }
         break;
       default:
         break;
@@ -163,7 +163,6 @@ export default function ReservationPage() {
             shopId={shopId}
             stripeConnectId={shop.stripeConnectId}
             stripeConnectStatus={shop.stripeConnectStatus}
-            bookingMode={bookingMode}
             onSelect={(course) => {
               setSelectedCourse(course);
               setStep("course-detail");
@@ -175,9 +174,9 @@ export default function ReservationPage() {
             shopId={shopId}
             course={selectedCourse}
             onBook={() => {
-              if (bookingMode === "request") {
+              if ( selectedCourse.enableRequestMode) {
                 setSelectedStaff(null);
-                setSelectedDate(""); // 空文字または特定の値を検討
+                setSelectedDate("");
                 setSelectedTime("");
                 setStep("confirm");
               } else {
@@ -223,9 +222,8 @@ export default function ReservationPage() {
             maxPartySize={maxPartySize}
             staffSelectionEnabled={staffSelectionEnabled}
             category={category}
-            bookingMode={bookingMode}
             onConfirm={async ({ customerName, customerEmail, customerPhone, partySize, customerNote }) => {
-              const isRequest = bookingMode === "request";
+              const isRequest = selectedCourse.enableRequestMode
               const res = await createReservation(shopId, {
                 customerName,
                 customerEmail,
@@ -235,11 +233,8 @@ export default function ReservationPage() {
                 time: selectedTime,
                 staffId: selectedStaff?.id || SHOP_STAFF_ID,
                 courseId: selectedCourse!.id,
-                // status: "confirmed",
-                // paid: selectedCourse!.prepaymentOnly,
                 status: isRequest ? "pending" : "confirmed",
                 paid: isRequest ? false : selectedCourse!.prepaymentOnly,
-                bookingMode: bookingMode,
                 partySize,
                 lineProfile:profile
               });
@@ -249,7 +244,7 @@ export default function ReservationPage() {
               setStep("complete");
             }}
             onBack={() => {
-              if (bookingMode === "request") {
+              if (selectedCourse.enableRequestMode) {
                 setStep("course-detail");
               } else {
                 setStep("datetime");
@@ -266,7 +261,6 @@ export default function ReservationPage() {
             time={selectedTime}
             reservationId={reservationId}
             reservationToken={reservationToken}
-            bookingMode={bookingMode}
             onClose={() => navigate(`${basePath}/shop/${shop.id}`)}
           />
         )}

@@ -12,6 +12,7 @@ import path from "path";
 import fs from "fs";
 // import { Pool } from "pg";
 import { Pool } from "@neondatabase/serverless";
+import axios from 'axios';
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -160,6 +161,7 @@ function toReservation(r: any) {
     customerPhone: r.customer_phone || undefined,
     customerEmail: r.customer_email || undefined,
     customerNote: r.customer_note || undefined,
+    customerCount: r.customer_count || undefined,
     date: r.date,
     time: r.time,
     staffId: r.staff_id || "__shop__",
@@ -177,197 +179,381 @@ async function safeQuery(fn: () => Promise<any>): Promise<any[]> {
 let _setup: Promise<void> | null = null;
 
 // ─── 予約完了メッセージ送信ロジック ───
-async function sendLineFlexMessage(lineId: string, lineMessageData: any, token: string) {
+async function sendLineFlexMessage(lineId: string, lineMessageData: any, token: string, isRequest: boolean) {
   const accessToken = 'DHKMhlfcGdViCvlTpkYev/MIYW5KDb638DfsA8H2B+Zw76puYKcaZHp4UPAUCKwp0cgW71DzySHTVyljlISnuWx0QWN+6ClWxK1bbunMEqLHpVjnI+r9x7ACCPQAB1GBmbUVui5TuWectUrbZ1H1zAdB04t89/1O/w1cDnyilFU=';
   const url = 'https://api.line.me/v2/bot/message/push';
 
   const [y, m, d] = lineMessageData.date.split("-");
   const dateLabel = `${y}年${m}月${d}日`;
 
-  const flexMessage = {
-    type: "bubble",
-    size: "mega",
-    body: {
-      type: "box",
-      layout: "vertical",
-      paddingAll: "0px",
-      contents: [
-        {
-          type: "box",
-          layout: "vertical",
-          backgroundColor: "#f97316",
-          paddingTop: "24px",
-          paddingBottom: "24px",
-          paddingStart: "20px",
-          paddingEnd: "20px",
-          contents: [
-            {
-              type: "text",
-              text: "予約完了通知",
-              weight: "bold",
-              size: "xl",
-              color: "#ffffff",
-              align: "center"
-            },
-          ]
-        },
-        {
-          type: "box",
-          layout: "vertical",
-          paddingAll: "20px",
-          spacing: "lg",
-          contents: [
-            {
-              type: "text",
-              text: "この度はご予約いただき誠にありがとうございます。\n以下の内容で承りましたので、内容をご確認ください。",
-              size: "sm",
-              color: "#666666",
-              wrap: true
-            },
-            {
-              type: "box",
-              layout: "vertical",
-              backgroundColor: "#fff7ed",
-              cornerRadius: "12px",
-              paddingAll: "16px",
-              spacing: "md",
-              contents: [
-                {
-                  type: "box",
-                  layout: "vertical",
-                  spacing: "xs",
-                  contents: [
-                    {
-                      type: "text",
-                      text: "店舗名",
-                      size: "xs",
-                      color: "#9ca3af"
-                    },
-                    {
-                      type: "text",
-                      text: lineMessageData.shop_name,
-                      size: "md",
-                      color: "#111827",
-                      weight: "bold",
-                      wrap: true
-                    }
-                  ]
-                },
-                {
-                  type: "separator",
-                  color: "#fdba74"
-                },
-                {
-                  type: "box",
-                  layout: "vertical",
-                  spacing: "xs",
-                  contents: [
-                    {
-                      type: "text",
-                      text: "予約コース",
-                      size: "xs",
-                      color: "#9ca3af"
-                    },
-                    {
-                      type: "text",
-                      text: lineMessageData.course_name,
-                      size: "md",
-                      color: "#111827",
-                      weight: "bold",
-                      wrap: true
-                    }
-                  ]
-                },
-                {
-                  type: "separator",
-                  color: "#fdba74"
-                },
-                {
-                  type: "box",
-                  layout: "vertical",
-                  spacing: "xs",
-                  contents: [
-                    {
-                      type: "text",
-                      text: "予約日時",
-                      size: "xs",
-                      color: "#9ca3af"
-                    },
-                    {
-                      type: "text",
-                      text: `${dateLabel} ${lineMessageData.time} 〜`,
-                      size: "md",
-                      color: "#111827",
-                      weight: "bold",
-                      wrap: true
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              type: "text",
-              text: "当日のご来店をスタッフ一同、心よりお待ちしております。",
-              size: "sm",
-              color: "#666666",
-              wrap: true
-            },
-            {
-              type: "box",
-              layout: "vertical",
-              spacing: "sm",
-              paddingTop: "16px",
-              contents: [
-                {
-                  type: "text",
-                  text: "キャンセルはこちら",
-                  size: "sm",
-                  color: "#666666",
-                  align: "center"
-                },
-                {
-                  type: "button",
-                  style: "primary",
-                  color: "#f97316",
-                  action: {
-                    type: "uri",
-                    label: "予約をキャンセルする",
-                    uri: `https://domain/app/cancel/${lineMessageData.shop_id}/${token}`
+  let flexMessage;
+  if (!isRequest) {
+    flexMessage = {
+      type: "bubble",
+      size: "mega",
+      body: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "0px",
+        contents: [
+          {
+            type: "box",
+            layout: "vertical",
+            backgroundColor: "#f97316",
+            paddingTop: "24px",
+            paddingBottom: "24px",
+            paddingStart: "20px",
+            paddingEnd: "20px",
+            contents: [
+              {
+                type: "text",
+                text: "予約完了通知",
+                weight: "bold",
+                size: "xl",
+                color: "#ffffff",
+                align: "center"
+              },
+            ]
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            paddingAll: "20px",
+            spacing: "lg",
+            contents: [
+              {
+                type: "text",
+                text: "この度はご予約いただき誠にありがとうございます。\n以下の内容で承りましたので、内容をご確認ください。",
+                size: "sm",
+                color: "#666666",
+                wrap: true
+              },
+              {
+                type: "box",
+                layout: "vertical",
+                backgroundColor: "#fff7ed",
+                cornerRadius: "12px",
+                paddingAll: "16px",
+                spacing: "md",
+                contents: [
+                  {
+                    type: "box",
+                    layout: "vertical",
+                    spacing: "xs",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "店舗名",
+                        size: "xs",
+                        color: "#9ca3af"
+                      },
+                      {
+                        type: "text",
+                        text: lineMessageData.shop_name,
+                        size: "md",
+                        color: "#111827",
+                        weight: "bold",
+                        wrap: true
+                      }
+                    ]
+                  },
+                  {
+                    type: "separator",
+                    color: "#fdba74"
+                  },
+                  {
+                    type: "box",
+                    layout: "vertical",
+                    spacing: "xs",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "予約コース",
+                        size: "xs",
+                        color: "#9ca3af"
+                      },
+                      {
+                        type: "text",
+                        text: lineMessageData.course_name,
+                        size: "md",
+                        color: "#111827",
+                        weight: "bold",
+                        wrap: true
+                      }
+                    ]
+                  },
+                  {
+                    type: "separator",
+                    color: "#fdba74"
+                  },
+                  {
+                    type: "box",
+                    layout: "vertical",
+                    spacing: "xs",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "予約日時",
+                        size: "xs",
+                        color: "#9ca3af"
+                      },
+                      {
+                        type: "text",
+                        text: `${dateLabel} ${lineMessageData.time} 〜`,
+                        size: "md",
+                        color: "#111827",
+                        weight: "bold",
+                        wrap: true
+                      }
+                    ]
                   }
-                },
-                {
-                  type: "text",
-                  text: "※キャンセルの有効期限は予約日の前日までとなります。\nそれ以降の変更はお電話にてご連絡ください。",
-                  size: "xs",
-                  color: "#9ca3af",
-                  wrap: true,
-                  align: "center"
-                }
-              ]
-            },
-            {
-              type: "text",
-              text: "© 2026 神奈川おでかけナビ All Rights Reserved.",
-              size: "xs",
-              color: "#c0c0c0",
-              align: "center",
-              margin: "md"
-            }
-          ]
-        }
-      ]
-    }
-  };
+                ]
+              },
+              {
+                type: "text",
+                text: "当日のご来店をスタッフ一同、心よりお待ちしております。",
+                size: "sm",
+                color: "#666666",
+                wrap: true
+              },
+              {
+                type: "box",
+                layout: "vertical",
+                spacing: "sm",
+                paddingTop: "16px",
+                contents: [
+                  {
+                    type: "text",
+                    text: "キャンセルはこちら",
+                    size: "sm",
+                    color: "#666666",
+                    align: "center"
+                  },
+                  {
+                    type: "button",
+                    style: "primary",
+                    color: "#f97316",
+                    action: {
+                      type: "uri",
+                      label: "予約をキャンセルする",
+                      uri: `https://domain/app/cancel/${lineMessageData.shop_id}/${token}`
+                    }
+                  },
+                  {
+                    type: "text",
+                    text: "※キャンセルの有効期限は予約日の前日までとなります。\nそれ以降の変更はお電話にてご連絡ください。",
+                    size: "xs",
+                    color: "#9ca3af",
+                    wrap: true,
+                    align: "center"
+                  }
+                ]
+              },
+              {
+                type: "text",
+                text: "© 2026 神奈川おでかけナビ All Rights Reserved.",
+                size: "xs",
+                color: "#c0c0c0",
+                align: "center",
+                margin: "md"
+              }
+            ]
+          }
+        ]
+      }
+    };
+  } else {
+    flexMessage = {
+      type: "bubble",
+      size: "mega",
+      body: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "0px",
+        contents: [
+          {
+            type: "box",
+            layout: "vertical",
+            backgroundColor: "#64748b", // 落ち着いたグレーネイビーに変更
+            paddingTop: "24px",
+            paddingBottom: "24px",
+            paddingStart: "20px",
+            paddingEnd: "20px",
+            contents: [
+              {
+                type: "text",
+                text: "予約リクエスト受付",
+                weight: "bold",
+                size: "xl",
+                color: "#ffffff",
+                align: "center"
+              }
+            ]
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            paddingAll: "20px",
+            spacing: "lg",
+            contents: [
+              {
+                type: "text",
+                text: "まだ予約は確定しておりません。\n店舗より改めてご連絡を差し上げます。",
+                size: "sm",
+                color: "#ef4444", // 注意を引く赤系
+                weight: "bold",
+                wrap: true
+              },
+              {
+                type: "box",
+                layout: "vertical",
+                backgroundColor: "#f8f9fa",
+                cornerRadius: "12px",
+                paddingAll: "16px",
+                spacing: "md",
+                contents: [
+                  {
+                    type: "box",
+                    layout: "vertical",
+                    spacing: "xs",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "現在の状態",
+                        size: "xs",
+                        color: "#9ca3af"
+                      },
+                      {
+                        type: "text",
+                        text: "店舗からの連絡待ち（予約未確定）",
+                        size: "md",
+                        color: "#f59e0b",
+                        weight: "bold"
+                      }
+                    ]
+                  },
+                  {
+                    type: "separator",
+                    color: "#e5e7eb"
+                  },
+                  {
+                    type: "box",
+                    layout: "vertical",
+                    spacing: "xs",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "予約店舗",
+                        size: "xs",
+                        color: "#9ca3af"
+                      },
+                      {
+                        type: "text",
+                        text: lineMessageData.shop_name,
+                        size: "md",
+                        color: "#111827",
+                        weight: "bold",
+                        wrap: true
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "vertical",
+                    spacing: "xs",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "予約コース",
+                        size: "xs",
+                        color: "#9ca3af"
+                      },
+                      {
+                        type: "text",
+                        text: lineMessageData.course_name,
+                        size: "md",
+                        color: "#111827",
+                        weight: "bold",
+                        wrap: true
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "vertical",
+                    spacing: "xs",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "人数",
+                        size: "xs",
+                        color: "#9ca3af"
+                      },
+                      {
+                        type: "text",
+                        text: lineMessageData.course_count,
+                        size: "md",
+                        color: "#111827",
+                        weight: "bold",
+                        wrap: true
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "vertical",
+                    spacing: "xs",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "備考",
+                        size: "xs",
+                        color: "#9ca3af"
+                      },
+                      {
+                        type: "text",
+                        text: lineMessageData.course_memo,
+                        size: "md",
+                        color: "#111827",
+                        weight: "bold",
+                        wrap: true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                type: "text",
+                text: "※店舗からの連絡があるまで今しばらくお待ちください。お急ぎの場合は直接お電話にてお問い合わせください。",
+                size: "xs",
+                color: "#666666",
+                wrap: true
+              },
+              {
+                type: "text",
+                text: "© 2026 神奈川おでかけナビ All Rights Reserved.",
+                size: "xs",
+                color: "#c0c0c0",
+                align: "center",
+                margin: "md"
+              }
+            ]
+          }
+        ]
+      }
+    };
+
+  }
 
   await axios.post(url, {
     to: lineId,
-    messages: [{ type: "flex", altText: "予約完了のお知らせ", contents: flexMessage }]
+    messages: [{ type: "flex", altText: "お知らせ", contents: flexMessage }]
   }, {
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
   });
 }
 
-async function sendEmailMessage(lineMessageData: any, token: string) {
+async function sendEmailMessage(lineMessageData: any, token: string, isRequest:boolean) {
   const transporter = nodemailer.createTransport({
     host: "smtp.office365.com",
     port: 587,
@@ -385,7 +571,16 @@ async function sendEmailMessage(lineMessageData: any, token: string) {
   const [y, m, d] = lineMessageData.date.split("-");
   const dateLabel = `${y}年${m}月${d}日`;
 
-  const templatePath = path.join(process.cwd(), 'server/mail_templates/reserved_email.html');
+  let templatePath;
+  let title;
+
+  if (!isRequest) {
+    templatePath = path.join(process.cwd(), 'server/mail_templates/reserved_email.html');
+    title = "予約完了しました"
+  } else {
+    templatePath = path.join(process.cwd(), 'server/mail_templates/request_reserved_email.html');
+    title = "予約リクエストを送信しました"
+  }
   const source = fs.readFileSync(templatePath, 'utf8');
 
   // 変数を流し込む
@@ -401,12 +596,12 @@ async function sendEmailMessage(lineMessageData: any, token: string) {
   await transporter.sendMail({
     from: '"予約システム" <n.tamura@askpro.co.jp>',
     to: lineMessageData.customer_email,
-    subject: '【予約完了】ご予約を承りました',
+    subject: title,
     html: htmlToSend,
   });
 }
 
-async function sendEmailToStore(lineMessageData: any) {
+async function sendEmailToStore(lineMessageData: any, isRequest: boolean) {
   const transporter = nodemailer.createTransport({
     host: "smtp.office365.com",
     port: 587,
@@ -424,7 +619,16 @@ async function sendEmailToStore(lineMessageData: any) {
   const [y, m, d] = lineMessageData.date.split("-");
   const dateLabel = `${y}年${m}月${d}日`;
 
-  const templatePath = path.join(process.cwd(), 'server/mail_templates/reserved_email_to_store.html');
+  let templatePath;
+  let title;
+
+  if (!isRequest) {
+    templatePath = path.join(process.cwd(), 'server/mail_templates/reserved_email_to_store.html'); 
+    title = "予約を受け付けました"
+  } else {
+    templatePath = path.join(process.cwd(), 'server/mail_templates/request_reserved_email_to_store.html'); 
+    title = "予約リクエストを受け付けました"
+  }
   const source = fs.readFileSync(templatePath, 'utf8');
 
   // 変数を流し込む
@@ -439,7 +643,7 @@ async function sendEmailToStore(lineMessageData: any) {
   await transporter.sendMail({
     from: '"予約システム" <n.tamura@askpro.co.jp>',
     to: lineMessageData.shop_email,
-    subject: '【予約完了】ご予約を承りました',
+    subject: title,
     html: htmlToSend,
   });
 }
@@ -513,7 +717,7 @@ export function ensureSetup(): Promise<void> {
           const rows = await sql`SELECT * FROM shops WHERE slug = ${slug}`;
           if (!rows[0]) return res.status(500).json({ message: "Failed to create shop" });
 
-          await sql`UPDATE shops SET reservation_url = CONCAT('/app/reservation/', id::text) WHERE id = ${rows[0].id} AND reservation_url IS NULL`;
+          // await sql`UPDATE shops SET reservation_url = CONCAT('/app/reservation/', id::text) WHERE id = ${rows[0].id} AND reservation_url IS NULL`;
           const updatedRows = await sql`SELECT * FROM shops WHERE id = ${rows[0].id}`;
           res.status(201).json(toShop(updatedRows[0]));
         } catch (e: any) { console.error("shop create error:", e); res.status(500).json({ message: "Failed to create shop" }); }
@@ -821,7 +1025,6 @@ export function ensureSetup(): Promise<void> {
         try {
           const {
             name,
-            category,
             duration,
             price,
             description,
@@ -830,7 +1033,7 @@ export function ensureSetup(): Promise<void> {
             imageUrl,
             staffIds,
           } = req.body;
-          await sql`INSERT INTO booking_courses (shop_id, name, category, duration, price, description, prepayment_only, enable_request_mode , image_url, staff_ids) VALUES (${shopId}, ${name || ""}, ${category || ""}, ${duration || 60}, ${price || 0}, ${description || ""}, ${prepaymentOnly || false}, ${enableRequestMode || false}, ${imageUrl || null}, ${staffIds || []})`;
+          await sql`INSERT INTO booking_courses (shop_id, name, duration, price, description, prepayment_only, enable_request_mode , image_url, staff_ids) VALUES (${shopId}, ${name || ""}, ${duration || 60}, ${price || 0}, ${description || ""}, ${prepaymentOnly || false}, ${enableRequestMode || false}, ${imageUrl || null}, ${staffIds || []})`;
           const maxRow =
             await sql`SELECT MAX(id) as id FROM booking_courses WHERE shop_id = ${shopId}`;
           const newId = maxRow[0]?.id;
@@ -853,7 +1056,6 @@ export function ensureSetup(): Promise<void> {
           const {
             id,
             name,
-            category,
             duration,
             price,
             description,
@@ -867,7 +1069,7 @@ export function ensureSetup(): Promise<void> {
             await sql`SELECT COUNT(*) as cnt FROM booking_courses WHERE id = ${courseId} AND shop_id = ${shopId}`;
           if (parseInt(cnt[0]?.cnt || "0") === 0)
             return res.status(404).json({ message: "Course not found" });
-          await sql`UPDATE booking_courses SET name=${name || ""}, category=${category || ""}, duration=${duration || 60}, price=${price || 0}, description=${description || ""}, prepayment_only=${prepaymentOnly || false}, enable_request_mode=${enableRequestMode || false}, image_url=${imageUrl || null}, staff_ids=${staffIds || []}, updated_at=NOW() WHERE id=${courseId} AND shop_id=${shopId}`;
+          await sql`UPDATE booking_courses SET name=${name || ""}, duration=${duration || 60}, price=${price || 0}, description=${description || ""}, prepayment_only=${prepaymentOnly || false}, enable_request_mode=${enableRequestMode || false}, image_url=${imageUrl || null}, staff_ids=${staffIds || []}, updated_at=NOW() WHERE id=${courseId} AND shop_id=${shopId}`;
           const rows =
             await sql`SELECT * FROM booking_courses WHERE id = ${courseId} AND shop_id = ${shopId}`;
           res.json(toCourse(rows[0]));
@@ -1147,6 +1349,7 @@ export function ensureSetup(): Promise<void> {
             customerPhone,
             customerEmail,
             customerNote,
+            partySize,
             date,
             time,
             staffId,
@@ -1157,7 +1360,7 @@ export function ensureSetup(): Promise<void> {
           if (!customerName || !courseId)
             return res.status(400).json({ message: "Missing required fields" });
           const token = crypto.randomUUID().replace(/-/g, "");
-          await sql`INSERT INTO booking_reservations (shop_id,customer_name,customer_phone,customer_email,customer_note,date,time,staff_id,course_id,status,paid,cancel_token) VALUES (${shopId},${customerName},${customerPhone || null},${customerEmail || null},${customerNote || null},${date},${time},${staffId || "__shop__"},${courseId.toString()},${status},false,${token})`;
+          await sql`INSERT INTO booking_reservations (shop_id,customer_name,customer_phone,customer_email,customer_note,customer_count,date,time,staff_id,course_id,status,paid,cancel_token) VALUES (${shopId},${customerName},${customerPhone || null},${customerEmail || null},${customerNote || null},${partySize || null},${date},${time},${staffId || "__shop__"},${courseId.toString()},${status},false,${token})`;
           const rows = await sql`SELECT * FROM booking_reservations WHERE cancel_token = ${token}`;
           const newReservation = rows[0];
           if (!newReservation)
@@ -1165,26 +1368,31 @@ export function ensureSetup(): Promise<void> {
               .status(500)
               .json({ message: "Failed to create reservation" });
           const sendMessageDataRecord =
-            await sql`SELECT s.name as shop_name, c.name as course_name,  bs.store_email as shop_email FROM booking_courses c JOIN shops s ON c.shop_id = s.id LEFT JOIN booking_settings bs ON s.id = bs.shop_id WHERE c.id = ${courseId}`;
+            await sql`SELECT s.name as shop_name, c.name as course_name, c.enable_request_mode,  bs.store_email as shop_email FROM booking_courses c JOIN shops s ON c.shop_id = s.id LEFT JOIN booking_settings bs ON s.id = bs.shop_id WHERE c.id = ${courseId}`;
+          const isRequest = sendMessageDataRecord[0].enable_request_mode
           const sendMessageData = {
-            "shop_id": shopId,
-            "shop_name": sendMessageDataRecord[0].shop_name,
-            "course_name": sendMessageDataRecord[0].course_name,
-            "shop_email": sendMessageDataRecord[0].shop_email,
-            "customer_email": customerEmail,
-            "date": date,
-            "time": time
+          "shop_id": shopId,
+          "shop_name": sendMessageDataRecord[0].shop_name,
+          "course_name": sendMessageDataRecord[0].course_name,
+          "shop_email": sendMessageDataRecord[0].shop_email,
+          "customer_name": customerName,
+          "customer_email": customerEmail,
+          "customer_phone": customerPhone,
+          "customer_memo": customerNote,
+          "customer_count": partySize,
+          "date": date,
+          "time": time
           }
           if (lineProfile) {
             const lineId = lineProfile.userId
             // LINEからプロフィールが取れてれば予約完了MSGをLINEに送信
-            sendLineFlexMessage(lineId, sendMessageData, token).catch(console.error);
+            sendLineFlexMessage(lineId, sendMessageData, token, isRequest).catch(console.error);
           } else {
             // そうでなければ予約時に入力したアドレスに送信（主にWEBからのアクセスを想定してます）
-            sendEmailMessage(sendMessageData, token).catch(console.error);
+            sendEmailMessage(sendMessageData, token, isRequest).catch(console.error);
           }
           // 予約完了メールを店舗側に送信
-          sendEmailToStore(sendMessageData).catch(console.error);
+          sendEmailToStore(sendMessageData, isRequest).catch(console.error);
           res.status(201).json(toReservation(rows[0]));
         } catch (e: any) {
           console.error("reservation error:", e);

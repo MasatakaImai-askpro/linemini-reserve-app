@@ -12,14 +12,13 @@ interface BookingCompleteProps {
   time: string;
   reservationId: string | null;
   reservationToken: string | null;
-  bookingMode?: "normal" | "request";
   onClose: () => void;
 }
 
-export function BookingComplete({ shopId, course, staff, date, time, reservationToken, onClose, bookingMode = "normal" }: BookingCompleteProps) {
+export function BookingComplete({ shopId, course, staff, date, time, reservationToken, onClose}: BookingCompleteProps) {
   // const parsedDate = parseISO(date);
   const parsedDate = date ? parseISO(date) : null;
-  const isRequest = bookingMode === "request";
+  const isRequest = course.enableRequestMode;
   const cancelUrl = reservationToken
     ? `${window.location.origin}/app/cancel/${shopId}/${reservationToken}`
     : null;

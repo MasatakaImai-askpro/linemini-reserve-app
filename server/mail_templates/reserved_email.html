@@ -31,7 +31,7 @@
         </div>
         
         <div class="content">
-            <!-- <p>{{customerName}} 様</p> -->
+            <p>{{customer_name}} 様</p>
             <p>この度はご予約いただき誠にありがとうございます。<br>以下の内容で承りましたので、内容をご確認ください。</p>
 
             <div class="info-card">
@@ -47,10 +47,14 @@
                     <span class="label">コース</span>
                     <span class="value">{{course_name}}</span>
                 </div>
-                <!-- <div class="info-item">
+                <div class="info-item">
                     <span class="label">人数</span>
-                    <span class="value">{{partySize}}名</span>
-                </div> -->
+                    <span class="value">{{course_count}}名</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">備考</span>
+                    <span class="value">{{course_memo}}名</span>
+                </div>
             </div>
 
             <p>当日のご来店をスタッフ一同、心よりお待ちしております。</p>

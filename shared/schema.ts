@@ -151,7 +151,6 @@ export const bookingCourses = pgTable("booking_courses", {
   id:                serial("id").primaryKey(),
   shopId:            integer("shop_id").notNull(),
   name:              text("name").notNull(),
-  category:          text("category").default(""),
   duration:          integer("duration").default(60),
   price:             integer("price").default(0),
   description:       text("description").default(""),
@@ -176,6 +175,8 @@ export const bookingReservations = pgTable("booking_reservations", {
   customerEmail: text("customer_email"),
   // 備考カラム追加
   customerNote:  text("customer_note"),
+  // 人数保持するカラム追加
+  customerCount: integer("customer_count").default(1),
   // 日時指定の予約を許容するためdateとtimeのnotnullは削除
   date:          text("date"),
   time:          text("time"),

@@ -25,7 +25,6 @@ interface PaymentConfirmProps {
   maxPartySize?: number;
   staffSelectionEnabled?: boolean;
   category: string;
-  bookingMode?: "normal" | "request";
   onConfirm: (info: { customerName: string; customerEmail: string; customerPhone: string; partySize?: number, customerNote: string }) => void;
   onBack: () => void;
 }
@@ -187,7 +186,6 @@ export function PaymentConfirm({
   maxPartySize = 20,
   staffSelectionEnabled = false,
   category,
-  bookingMode = "normal",
   onConfirm,
   onBack,
 }: PaymentConfirmProps) {
@@ -230,9 +228,8 @@ export function PaymentConfirm({
       customerPhone: customerPhone.trim(),
       partySize: showPartySize ? partySize : undefined,
       customerNote: notes.trim(),
-      bookingMode: bookingMode
     };
-    if (!needsPayment || bookingMode === "request") {
+    if (!needsPayment) {
       onConfirm(info);
     } else {
       setFormSubmitted(true);
@@ -252,7 +249,7 @@ export function PaymentConfirm({
         <div>
           <div className="text-xs text-muted-foreground">日時</div>
           <div className="text-sm font-bold text-foreground" data-testid="text-confirm-datetime">
-          {bookingMode === "request" ? (
+          {course.enableRequestMode ? (
             "店舗と相談して決定"
           ) : (
             parsedDate ? `${format(parsedDate, "yyyy年M月d日(E)", { locale: ja })} ${time}` : "日時未設定"

@@ -686,7 +686,7 @@ export default function ShopAdminPage() {
   const params = useParams<{ id: string }>();
   const shopId = parseInt(params.id || "0");
 
-  const [activeTab, setActiveTab] = useState<ShopAdminTab>("images");
+  const [activeTab, setActiveTab] = useState<ShopAdminTab>("stores");
 
   const { data: shop, isLoading } = useQuery<Shop>({
     queryKey: ["/api/shops", params.id],

@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1775188279279,
-      "tag": "0000_boring_meteorite",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1775793391284,
-      "tag": "0001_neat_kylun",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1776147371570,
-      "tag": "0003_shop_menu_items",
+      "when": 1776229133652,
+      "tag": "0000_funny_mordo",
       "breakpoints": true
     }
   ]

@@ -21,17 +21,13 @@
         <p>新しい予約が入りました。内容を確認してください。</p>
 
         <div class="section">
-            <div><span class="label">予約日時：</span><span class="value highlight">{{date}} {{time}}〜</span></div>
+            <div><span class="label">お客様名：</span><span class="value">{{customer_name}}</span></div>
+            <div><span class="label">お客様電話番号：</span><span class="value">{{customer_phone}}</span></div>
+            <div><span class="label">お客様アドレス：</span><span class="value">{{customer_email}}</span></div>
             <div><span class="label">コース：</span><span class="value">{{course_name}}</span></div>
-            <!-- <div><span class="label">人数：</span><span class="value">{{partySize}}名</span></div> -->
+            <div><span class="label">人数：</span><span class="value">{{customer_count}}名</span></div>
+            <div><span class="label">備考：</span><span class="value">{{customer_memo}}</span></div>
         </div>
-
-        <!-- <div class="section">
-            <h3>お客様情報</h3>
-            <div><span class="label">お名前：</span><span class="value">{{customerName}} 様</span></div>
-            <div><span class="label">電話番号：</span><span class="value">{{customerPhone}}</span></div>
-            <div><span class="label">メール：</span><span class="value">{{customerEmail}}</span></div>
-        </div> -->
 
         <div class="footer">
             <p>※本メールはシステムより自動送信されています。<br>

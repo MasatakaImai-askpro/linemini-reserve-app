@@ -23,7 +23,6 @@ export function CourseDetail({ course, onBook }: CourseDetailProps) {
       <div className="flex flex-col gap-4 px-4 py-5">
         <div>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-[10px]">{course.category}</Badge>
             {course.prepaymentOnly && (
               <Badge variant="secondary" className="gap-1 bg-primary/10 text-primary text-[10px] px-1.5 py-0">
                 <CreditCard className="h-2.5 w-2.5" />

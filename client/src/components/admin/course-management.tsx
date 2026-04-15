@@ -47,7 +47,6 @@ export function CourseManagement({ shopId }: { shopId: number }) {
   const openAdd = () => {
     setEditingCourse(null);
     setFormName("");
-    setFormCategory("その他");
     setFormDuration(60);
     setFormPrice(0);
     setFormDescription("");
@@ -61,7 +60,6 @@ export function CourseManagement({ shopId }: { shopId: number }) {
   const openEdit = (course: Course) => {
     setEditingCourse(course);
     setFormName(course.name);
-    setFormCategory(course.category);
     setFormDuration(course.duration);
     setFormPrice(course.price);
     setFormDescription(course.description);
@@ -94,7 +92,6 @@ export function CourseManagement({ shopId }: { shopId: number }) {
     setSaving(true);
     const data = {
       name: formName,
-      category: formCategory,
       duration: formDuration,
       price: formPrice,
       description: formDescription,
@@ -152,7 +149,6 @@ export function CourseManagement({ shopId }: { shopId: number }) {
           <TableHeader>
             <TableRow>
               <TableHead>コース名</TableHead>
-              <TableHead>カテゴリ</TableHead>
               <TableHead className="text-right">時間</TableHead>
               <TableHead className="text-right">料金</TableHead>
               <TableHead>担当者</TableHead>
@@ -164,9 +160,6 @@ export function CourseManagement({ shopId }: { shopId: number }) {
             {courseList.map((course) => (
               <TableRow key={course.id} data-testid={`course-row-${course.id}`}>
                 <TableCell className="font-medium text-foreground">{course.name}</TableCell>
-                <TableCell>
-                  <Badge variant="secondary">{course.category}</Badge>
-                </TableCell>
                 <TableCell className="text-right text-sm text-muted-foreground">
                   {formatDuration(course.duration)}
                 </TableCell>
@@ -220,26 +213,6 @@ export function CourseManagement({ shopId }: { shopId: number }) {
             <div>
               <label className="mb-1 block text-sm font-medium text-foreground">コース名</label>
               <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="例: フェイシャルベーシック" data-testid="input-course-name" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-foreground">カテゴリ</label>
-              <Select value={formCategory} onValueChange={setFormCategory}>
-                <SelectTrigger data-testid="select-course-category">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="フェイシャル">フェイシャル</SelectItem>
-                  <SelectItem value="ボディ">ボディ</SelectItem>
-                  <SelectItem value="ヘア">ヘア</SelectItem>
-                  <SelectItem value="リラクゼーション">リラクゼーション</SelectItem>
-                  <SelectItem value="食事">食事</SelectItem>
-                  <SelectItem value="宴会">宴会</SelectItem>
-                  <SelectItem value="寿司">寿司</SelectItem>
-                  <SelectItem value="席予約">席予約</SelectItem>
-                  <SelectItem value="脱毛">脱毛</SelectItem>
-                  <SelectItem value="その他">その他</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

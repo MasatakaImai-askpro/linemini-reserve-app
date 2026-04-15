@@ -205,7 +205,7 @@ export default function DetailPage() {
     enabled: !!params.id,
   });
 
-  const hasRequestCourse = courses.some(c => c.enableRequestMode);
+
 
   const { isFavorite, toggleFavorite } = useFavorites();
   const { acquireCoupon, isAcquired } = useCoupons();
@@ -392,19 +392,6 @@ export default function DetailPage() {
                 </Link>
               </Button>
 
-              {/*「日時を選択せず予約」ボタン（フラグがある場合のみ）*/}
-              {hasRequestCourse && (
-                <Button
-                  variant="outline"
-                  className="w-full border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 font-bold py-6 text-base"
-                  asChild
-                >
-                  <Link href={`${reservationPath}?mode=request`} data-testid="link-reservation-request">
-                    <MessageCircle className="w-5 h-5 mr-2" />
-                    日時を選択せず予約（リクエスト）
-                  </Link>
-                </Button>
-              )}
             </div>
           )}
 

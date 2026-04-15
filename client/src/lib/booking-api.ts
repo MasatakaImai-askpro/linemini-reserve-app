@@ -30,6 +30,7 @@ export interface Reservation {
   customerPhone?: string;
   customerEmail?: string;
   customerNote?: string;
+  customerCount?: number;
   date: string;
   time: string;
   staffId: string;
@@ -38,7 +39,6 @@ export interface Reservation {
   paid: boolean;
   partySize?: number;
   lineProfile: string;
-  bookingMode?: "normal" | "request";
 }
 
 export interface CancelInfo {
