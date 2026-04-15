@@ -13,11 +13,11 @@ CREATE TABLE "booking_courses" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"shop_id" integer NOT NULL,
 	"name" text NOT NULL,
-	"category" text DEFAULT '',
 	"duration" integer DEFAULT 60,
 	"price" integer DEFAULT 0,
 	"description" text DEFAULT '',
 	"prepayment_only" boolean DEFAULT false,
+	"enable_request_mode" boolean DEFAULT false,
 	"image_url" text,
 	"staff_ids" text[] DEFAULT '{}',
 	"is_active" boolean DEFAULT true,
@@ -31,8 +31,10 @@ CREATE TABLE "booking_reservations" (
 	"customer_name" text NOT NULL,
 	"customer_phone" text,
 	"customer_email" text,
-	"date" text NOT NULL,
-	"time" text NOT NULL,
+	"customer_note" text,
+	"customer_count" integer DEFAULT 1,
+	"date" text,
+	"time" text,
 	"staff_id" text DEFAULT '__shop__',
 	"course_id" text NOT NULL,
 	"status" text DEFAULT 'confirmed',
@@ -53,7 +55,21 @@ CREATE TABLE "booking_settings" (
 	"banner_url" text DEFAULT '',
 	"staff_selection_enabled" text DEFAULT 'false',
 	"table_count" integer DEFAULT 0,
+	"cancel_limit_days" integer DEFAULT 1,
 	"max_party_size" integer DEFAULT 0,
+	"store_open_time" text DEFAULT '10:00',
+	"store_close_time" text DEFAULT '19:00',
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "booking_slots" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"shop_id" integer NOT NULL,
+	"staff_id" text NOT NULL,
+	"day_of_week" integer NOT NULL,
+	"time" text NOT NULL,
+	"available" boolean DEFAULT true NOT NULL,
 	"updated_at" timestamp DEFAULT now()
 );
 --> statement-breakpoint
@@ -99,6 +115,18 @@ CREATE TABLE "shop_categories" (
 	"category_id" integer NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "shop_menu_items" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"shop_id" integer NOT NULL,
+	"name" text NOT NULL,
+	"price" integer DEFAULT 0 NOT NULL,
+	"comment" text DEFAULT '' NOT NULL,
+	"image_url" text,
+	"is_visible" boolean DEFAULT true NOT NULL,
+	"display_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "shops" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"slug" text NOT NULL,
@@ -124,7 +152,7 @@ CREATE TABLE "shops" (
 	"like_count" integer DEFAULT 0 NOT NULL,
 	"stripe_connect_id" text,
 	"stripe_connect_status" text DEFAULT 'none',
-	"table_count" integer,
+	"table_count" integer DEFAULT 0,
 	"max_party_size" integer,
 	"staff_selection_enabled" boolean DEFAULT false NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
@@ -153,4 +181,5 @@ CREATE TABLE "users" (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX "booking_reservations_cancel_token_idx" ON "booking_reservations" USING btree ("cancel_token");--> statement-breakpoint
+CREATE UNIQUE INDEX "booking_slots_idx" ON "booking_slots" USING btree ("shop_id","staff_id","day_of_week","time");--> statement-breakpoint
 CREATE UNIQUE INDEX "shop_categories_idx" ON "shop_categories" USING btree ("shop_id","category_id");
