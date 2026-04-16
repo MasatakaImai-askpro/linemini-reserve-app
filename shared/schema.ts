@@ -142,6 +142,7 @@ export const bookingStaff = pgTable("booking_staff", {
   avatar:    text("avatar").default(""),
   isActive:  boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // ─────────────────────────────
@@ -186,6 +187,7 @@ export const bookingReservations = pgTable("booking_reservations", {
   paid:          boolean("paid").default(false),
   cancelToken:   text("cancel_token"),
   createdAt:     timestamp("created_at").defaultNow(),
+  updatedAt:     timestamp("updated_at").defaultNow(),
 }, (t) => [
   uniqueIndex("booking_reservations_cancel_token_idx").on(t.cancelToken),
 ]);
@@ -210,7 +212,7 @@ export const bookingSettings = pgTable("booking_settings", {
   maxPartySize:         integer("max_party_size").default(0),
   storeOpenTime:        text("store_open_time").default("10:00"),
   storeCloseTime:       text("store_close_time").default("19:00"),
-  createdAt:           timestamp("created_at").defaultNow(),
+  createdAt:            timestamp("created_at").defaultNow(),
   updatedAt:            timestamp("updated_at").defaultNow(),
 });
 
@@ -225,6 +227,7 @@ export const shopMenuItems = pgTable("shop_menu_items", {
     isVisible:    boolean("is_visible").notNull().default(true),
     displayOrder: integer("display_order").notNull().default(0),
     createdAt:    timestamp("created_at").notNull().defaultNow(),
+    updatedAt:    timestamp("updated_at").defaultNow(),
   });
   export type InsertShopMenuItem = typeof shopMenuItems.$inferInsert;
   export type ShopMenuItem       = typeof shopMenuItems.$inferSelect;
