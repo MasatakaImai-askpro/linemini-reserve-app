@@ -1093,6 +1093,8 @@ export function ensureSetup(): Promise<void> {
         try {
           const date = req.query.date as string;
           const courseId = req.query.courseId as string | undefined;
+          const staffId = req.query.staffId as string | undefined;
+
           console.log("slots request - shopId:", shopId, "date:", date, "courseId:", courseId);
           
           // Validate date format
@@ -1105,7 +1107,17 @@ export function ensureSetup(): Promise<void> {
           if (parseInt(settingsCnt[0]?.cnt || "0") > 0) { const sr = await sql`SELECT store_open_time, store_close_time FROM booking_settings WHERE shop_id=${shopId}`; if (sr[0]) { const ot = sr[0].store_open_time; const ct = sr[0].store_close_time; openHour = typeof ot === "string" ? parseInt(ot.split(":")[0], 10) : (typeof ot === "number" ? ot : 10); closeHour = typeof ct === "string" ? parseInt(ct.split(":")[0], 10) : (typeof ct === "number" ? ct : 19); } }
           const allSlots: string[] = [];
           for (let h = openHour; h < closeHour; h++) { allSlots.push(`${String(h).padStart(2,"0")}:00`); if (h < closeHour - 1 || closeHour - h > 1) allSlots.push(`${String(h).padStart(2,"0")}:30`); }
-          console.log("allSlots:", allSlots);
+          // console.log("allSlots:", allSlots);
+          
+          if(!date && staffId) {
+            const slots = await sql`
+            SELECT day_of_week, time, available
+            FROM booking_slots
+            WHERE shop_id = ${shopId}
+            AND staff_id = ${staffId}
+            `;
+            return res.json(slots);
+          }
           if (!date) return res.json(allSlots.map(t => ({ time: t, available: true })));
           
           let tableCount = 1;
@@ -1153,11 +1165,25 @@ export function ensureSetup(): Promise<void> {
               console.warn("Error processing reservation:", r, pe);
             }
           }
-          
+
+          let unvaiavleTimes = new Set<string>();
+          if (staffId && staffId !== "__shop__" && date) {
+            const dayOfWeek = new Date(date).getDay();
+            const unvaliavle = await sql`
+            Select time from booking_slots
+            WHERE shop_id = ${shopId}
+            AND staff_id = ${staffId}
+            AND day_of_week = ${dayOfWeek}
+            AND available = false
+            `;
+            unvaiavleTimes = new Set(unvaliavle.map((u: any) => u.time));
+          }
+
           const result = allSlots.map(slot => { 
             const [sh,sm]=slot.split(":").map(Number);
             const sStart=sh*60+sm;
             if (sStart+courseDuration>closeHour*60) return {time:slot,available:false};
+            if (unvaiavleTimes.has(slot)) return {time:slot,available:false};
             let max=0;
             for(let i=0;i<slotsNeeded;i++){
               const cm=sStart+i*30;
@@ -1217,6 +1243,8 @@ export function ensureSetup(): Promise<void> {
               store_phone: s.store_phone || "",
               store_email: s.store_email || "",
               store_hours: s.store_hours || "",
+              store_open_time: s.store_open_time || "10:00",
+              store_close_time: s.store_close_time || "19:00",
               store_closed_days: s.store_closed_days || "",
               banner_url: s.banner_url || "",
               staff_selection_enabled: s.staff_selection_enabled || false,
@@ -1243,7 +1271,9 @@ export function ensureSetup(): Promise<void> {
             store_phone: s.phone || "",
             store_email: "",
             store_hours: s.hours || "",
-            store_closed_days: s.closed_days || "",
+            store_open_time: s.store_open_time || "10:00",
+            store_close_time: s.store_close_time || "19:00",
+            store_closed_days: s.store_closed_days || "",
             banner_url: s.image_url || "",
             staff_selection_enabled: s.enable_staff_assignment
               ? true
@@ -1286,12 +1316,16 @@ export function ensureSetup(): Promise<void> {
               INSERT INTO booking_settings (
                 shop_id, store_name, store_description, store_address, store_phone,
                 store_email, store_hours, store_closed_days, banner_url,
-                staff_selection_enabled, table_count, max_party_size, updated_at
+                staff_selection_enabled, table_count, max_party_size,
+                store_open_time, store_close_time,
+                updated_at
               ) VALUES (
                 ${shopId}, ${s.store_name || ""}, ${s.store_description || ""}, ${s.store_address || ""},
                 ${s.store_phone || ""}, ${s.store_email || ""}, ${s.store_hours || ""},
                 ${s.store_closed_days || ""}, ${s.banner_url || ""}, ${s.staff_selection_enabled || false},
-                ${parseInt(s.table_count || "0", 10)}, ${parseInt(s.max_party_size || "0", 10)}, NOW()
+                ${parseInt(s.table_count || "0", 10)}, ${parseInt(s.max_party_size || "0", 10)}, 
+                ${s.store_open_time || "10:00"}, ${s.store_close_time || "19:00"},
+                NOW()
               )
             `;
           } else {
@@ -1308,6 +1342,8 @@ export function ensureSetup(): Promise<void> {
             if (s.staff_selection_enabled !== undefined) await sql`UPDATE booking_settings SET staff_selection_enabled = ${s.staff_selection_enabled} WHERE shop_id = ${shopId}`;
             if (s.table_count !== undefined) await sql`UPDATE booking_settings SET table_count = ${parseInt(s.table_count, 10)} WHERE shop_id = ${shopId}`;
             if (s.max_party_size !== undefined) await sql`UPDATE booking_settings SET max_party_size = ${parseInt(s.max_party_size, 10)} WHERE shop_id = ${shopId}`;
+            if (s.store_open_time !== undefined) await sql`UPDATE booking_settings SET store_open_time = ${s.store_open_time} WHERE shop_id = ${shopId}`;
+            if (s.store_close_time !== undefined) await sql`UPDATE booking_settings SET store_close_time = ${s.store_close_time} WHERE shop_id = ${shopId}`;
             
             await sql`UPDATE booking_settings SET updated_at = NOW() WHERE shop_id = ${shopId}`;
           }

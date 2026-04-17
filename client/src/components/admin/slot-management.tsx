@@ -69,8 +69,8 @@ export function SlotManagement({ shopId }: { shopId: number }) {
     fetchSlots(shopId, selectedStaff).then((slots) => {
       const states: SlotState = {};
       slots.forEach((s) => {
-        const slot = s as unknown as { dayOfWeek: number; time: string; available: boolean };
-        states[`${selectedStaff}-${slot.dayOfWeek}-${slot.time}`] = slot.available;
+        const slot = s as unknown as { day_of_week: number; time: string; available: boolean };
+        states[`${selectedStaff}-${slot.day_of_week}-${slot.time}`] = slot.available;
       });
       setSlotStates(states);
     });
