@@ -285,7 +285,7 @@ export function ReservationList({ shopId }: { shopId: number }) {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-foreground">時間</label>
-                <Input value={editForm.time} onChange={(e) => setEditForm({ ...editForm, time: e.target.value })} placeholder="10:00" data-testid="input-edit-time" />
+                <Input type="time" value={editForm.time} onChange={(e) => setEditForm({ ...editForm, time: e.target.value })} placeholder="10:00" data-testid="input-edit-time" />
               </div>
             </div>
             <div>
