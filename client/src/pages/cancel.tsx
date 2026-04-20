@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useBasePath } from "@/hooks/use-base-path";
-import { Ban, Calendar, Clock, CreditCard, Check, Loader2, AlertTriangle } from "lucide-react";
+import { Ban, Calendar, Clock, CreditCard, Check, Loader2, AlertTriangle, User  } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { fetchCancelInfo, executeCancelByToken, formatPrice, formatDuration, type CancelInfo } from "@/lib/booking-api";
@@ -76,17 +76,13 @@ export default function CancelPage() {
     );
   }
 
-  // const parsedDate = parseISO(info.date);
   const parsedDate = info?.date ? parseISO(info.date) : null;
-
   const startAt = info.date
   const limit = info.cancelLimit
-
-  // const deadline = dayjs(startAt).startOf('day').subtract(limit, 'day');
-  // const isTooLate = dayjs().isAfter(deadline);
   const isTooLate = startAt 
     ? dayjs().isAfter(dayjs(startAt).startOf('day').subtract(limit, 'day'))
     : false;
+  const totalAmount = info.coursePrice * info.partySize; 
 
   if (cancelled) {
     return (
@@ -183,11 +179,18 @@ export default function CancelPage() {
             </div>
           </div>
           <div className="flex items-start gap-3 px-6 py-3">
+            <User className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <div>
+              <div className="text-xs text-muted-foreground">人数</div>
+              <div className="text-sm font-bold" data-testid="text-cancel-course">{info.partySize}</div>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 px-6 py-3">
             <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
             <div>
               <div className="text-xs text-muted-foreground">料金</div>
               <div className="text-sm font-bold" data-testid="text-cancel-price">
-                {formatPrice(info.coursePrice)}
+                {formatPrice(totalAmount)}
               </div>
             </div>
           </div>

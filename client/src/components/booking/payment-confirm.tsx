@@ -36,6 +36,7 @@ function CardPaymentForm({
   customerName,
   customerEmail,
   customerPhone,
+  amount,
   onPaid,
   onBack,
   children,
@@ -45,6 +46,7 @@ function CardPaymentForm({
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  amount: number;
   onPaid: (paymentIntentId: string) => void;
   onBack: () => void;
   children: React.ReactNode;
@@ -63,7 +65,7 @@ function CardPaymentForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         shopId,
-        amount: course.price,
+        amount: amount,
         currency: "jpy",
         courseName: course.name,
         courseId: course.id,
@@ -75,7 +77,7 @@ function CardPaymentForm({
         else setPiError(data.error || "決済の準備に失敗しました");
       })
       .catch(() => setPiError("決済の準備に失敗しました"));
-  }, [shopId, course.price, course.name, course.id]);
+  }, [shopId, amount, course.name, course.id]);
 
   const handlePay = async () => {
     if (!stripe || !elements || !clientSecret) return;
@@ -157,7 +159,7 @@ function CardPaymentForm({
           {paying ? (
             <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />決済中...</span>
           ) : (
-            `${formatPrice(course.price)} を支払って予約確定`
+            `${formatPrice(amount)} を支払って予約確定`
           )}
         </Button>
         <Button variant="outline" onClick={onBack} className="w-full py-5 text-sm" data-testid="button-confirm-back">
@@ -263,6 +265,8 @@ export function PaymentConfirm({
   // 人数を表示させるか否か
   const isPartySizeVisible = showPartySize && targetCategory;
 
+  const totalAmount = course.price * (partySize || 1);
+
   const bookingInfo = (
     <div className="flex flex-col gap-0 divide-y divide-border bg-card">
       <div className="flex items-start gap-3 px-4 py-3">
@@ -303,7 +307,7 @@ export function PaymentConfirm({
       )}
       <div className="flex items-center justify-between px-4 py-3">
         <span className="text-sm font-bold text-foreground">お支払い金額</span>
-        <span className="text-xl font-bold text-primary" data-testid="text-confirm-price">{formatPrice(course.price)}</span>
+        <span className="text-xl font-bold text-primary" data-testid="text-confirm-price">{formatPrice(totalAmount)}</span>
       </div>
       <div className="px-4 py-3">
         <div className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
@@ -335,6 +339,7 @@ export function PaymentConfirm({
             customerName={customerName}
             customerEmail={customerEmail}
             customerPhone={customerPhone}
+            amount={totalAmount}
             onPaid={(piId) => onConfirm({
               customerName: customerName.trim(),
               customerEmail: customerEmail.trim(),

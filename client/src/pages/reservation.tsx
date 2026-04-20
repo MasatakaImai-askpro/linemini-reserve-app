@@ -45,6 +45,7 @@ export default function ReservationPage() {
   const [maxPartySize, setMaxPartySize] = useState(20);
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [reservationToken, setReservationToken] = useState<string | null>(null);
+  const [reservedPartySize, setReservedPartySize] = useState<number | null>(null);
   const [category, setCategory] = useState<string>("");
 
   useEffect(() => {
@@ -243,6 +244,7 @@ export default function ReservationPage() {
               const result = res as { id: string; reservationToken: string };
               setReservationId(result.id);
               setReservationToken(result.reservationToken);
+              setReservedPartySize(partySize ?? null);
               setStep("complete");
             }}
             onBack={() => {
@@ -258,6 +260,7 @@ export default function ReservationPage() {
           <BookingComplete
             shopId={shopId}
             course={selectedCourse}
+            partySize={reservedPartySize ?? 1}
             staff={selectedStaff}
             date={selectedDate}
             time={selectedTime}
