@@ -39,6 +39,7 @@ export interface Reservation {
   paid: boolean;
   partySize?: number;
   lineProfile: string;
+  stripePaymentIntentId?: string;
 }
 
 export interface CancelInfo {
@@ -52,6 +53,7 @@ export interface CancelInfo {
   coursePrice: number;
   status: string;
   cancelLimit: number; 
+  partySize: number;
 }
 
 export const fetchCancelInfo = (shopId: number, token: string) =>

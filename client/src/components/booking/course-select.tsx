@@ -31,7 +31,7 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
   const [courses, setCourses] = useState<Course[]>([]);
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [loading, setLoading] = useState(true);
-    const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
   const [showForm, setShowForm] = useState(false);
   const [formName, setFormName] = useState("");
@@ -46,7 +46,15 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
       Promise.all([
         fetchCourses(shopId),
         fetchSettings(shopId),
-        fetch(`/api/shops/${shopId}/menu-items`).then((r) => r.ok ? r.json() : []),
+        fetch(`/api/shops/${shopId}/menu-items`)
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data) => {
+          return data.map((item: any) => ({
+            ...item,
+            isVisible: item.is_visible,
+            imageUrl: item.image_url
+          }));
+        }),
       ]).then(([c, s, m]) => {
         setCourses(c);
         setSettings(s);
@@ -104,7 +112,7 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
               メニュー
             </button>
           )}
-                  <button
+          <button
           onClick={() => setActiveTab("store-info")}
           className={`flex-1 px-4 py-3 text-center text-sm font-bold ${
             activeTab === "store-info"

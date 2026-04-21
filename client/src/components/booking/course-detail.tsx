@@ -1,4 +1,4 @@
-import { Clock, CreditCard } from "lucide-react";
+import { Clock, CreditCard, Info } from "lucide-react";
 import { formatPrice, formatDuration, type Course } from "@/lib/booking-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,12 +50,24 @@ export function CourseDetail({ course, onBook }: CourseDetailProps) {
           </p>
         </div>
 
+        {course.enableRequestMode && (
+          <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
+            <Info className="h-5 w-5 shrink-0 text-amber-600" />
+            <div className="text-xs leading-relaxed">
+              <p className="font-bold mb-0.5">日時指定なしの予約となります</p>
+              <p>
+                リクエスト送信後、店舗よりご連絡いたしますので日程調整を行ってください。
+              </p>
+            </div>
+          </div>
+        )}
+
         <Button
           onClick={onBook}
           className="mt-2 w-full rounded-xl py-6 text-base font-bold"
           data-testid="button-book-course"
         >
-          このコースを予約する
+          {course.enableRequestMode ? "予約リクエストを送信する" : "このコースを予約する"}
         </Button>
       </div>
     </div>

@@ -45,6 +45,7 @@ export default function ReservationPage() {
   const [maxPartySize, setMaxPartySize] = useState(20);
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [reservationToken, setReservationToken] = useState<string | null>(null);
+  const [reservedPartySize, setReservedPartySize] = useState<number | null>(null);
   const [category, setCategory] = useState<string>("");
 
   useEffect(() => {
@@ -215,6 +216,7 @@ export default function ReservationPage() {
         {step === "confirm" && selectedCourse && (
           <PaymentConfirm
             shopId={shopId}
+            stripeConnectId={shop.stripeConnectId ?? undefined}
             course={selectedCourse}
             staff={selectedStaff}
             date={selectedDate}
@@ -222,7 +224,7 @@ export default function ReservationPage() {
             maxPartySize={maxPartySize}
             staffSelectionEnabled={staffSelectionEnabled}
             category={category}
-            onConfirm={async ({ customerName, customerEmail, customerPhone, partySize, customerNote }) => {
+            onConfirm={async ({ customerName, customerEmail, customerPhone, partySize, customerNote, stripePaymentIntentId  }) => {
               const isRequest = selectedCourse.enableRequestMode
               const res = await createReservation(shopId, {
                 customerName,
@@ -236,11 +238,13 @@ export default function ReservationPage() {
                 status: isRequest ? "pending" : "confirmed",
                 paid: isRequest ? false : selectedCourse!.prepaymentOnly,
                 partySize,
-                lineProfile:profile
+                lineProfile:profile,
+                stripePaymentIntentId: stripePaymentIntentId || undefined,
               });
               const result = res as { id: string; reservationToken: string };
               setReservationId(result.id);
               setReservationToken(result.reservationToken);
+              setReservedPartySize(partySize ?? null);
               setStep("complete");
             }}
             onBack={() => {
@@ -256,6 +260,7 @@ export default function ReservationPage() {
           <BookingComplete
             shopId={shopId}
             course={selectedCourse}
+            partySize={reservedPartySize ?? 1}
             staff={selectedStaff}
             date={selectedDate}
             time={selectedTime}

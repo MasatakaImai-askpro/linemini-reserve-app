@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #333; line-height: 1.6; }
+        .container { max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; }
+        /* リクエスト用は少し色味をオレンジや青に変えると区別しやすいです */
+        .header { background-color: #f8f9fa; padding: 10px 20px; border-bottom: 3px solid #ffc107; margin-bottom: 20px; }
+        .label { font-weight: bold; width: 120px; display: inline-block; color: #666; }
+        .value { display: inline-block; }
+        .section { margin-bottom: 15px; padding: 10px; border-bottom: 1px dashed #eee; }
+        .footer { font-size: 12px; color: #999; margin-top: 30px; text-align: center; }
+        .alert-box { background-color: #fff3cd; color: #856404; padding: 10px; border-radius: 4px; margin-bottom: 20px; font-weight: bold; }
+        .highlight { color: #007bff; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>予約リクエストのお知らせ</h2>
+        </div>
+        
+        <div class="alert-box">
+            ⚠ まだ予約は確定していません。予約確定後は管理画面より予約ステータスの更新を行ってください。
+        </div>
+
+        <p>お客様より予約のリクエストが届きました。内容を確認し、お客様へご連絡をお願いします。</p>
+
+        <div class="section">
+            <div><span class="label">お客様名：</span><span class="value">{{customer_name}}</span></div>
+            <div><span class="label">お客様電話番号：</span><span class="value">{{customer_phone}}</span></div>
+            <div><span class="label">お客様アドレス：</span><span class="value">{{customer_email}}</span></div>
+            <div><span class="label">コース：</span><span class="value">{{course_name}}</span></div>
+            <div><span class="label">人数：</span><span class="value">{{customer_count}}名</span></div>
+            <div><span class="label">備考：</span><span class="value">{{customer_memo}}</span></div>
+        </div>
+
+        <div class="footer">
+            <p>※本メールはシステムより自動送信されています。<br>
+            <p>&copy; 2026 神奈川おでかけナビ All Rights Reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -166,25 +166,26 @@ export const bookingCourses = pgTable("booking_courses", {
 // 予約：予約データ
 // ─────────────────────────────
 export const bookingReservations = pgTable("booking_reservations", {
-  id:            serial("id").primaryKey(),
-  shopId:        integer("shop_id").notNull(),
-  customerName:  text("customer_name").notNull(),
-  customerPhone: text("customer_phone"),
-  customerEmail: text("customer_email"),
+  id:                    serial("id").primaryKey(),
+  shopId:                integer("shop_id").notNull(),
+  customerName:          text("customer_name").notNull(),
+  customerPhone:         text("customer_phone"),
+  customerEmail:         text("customer_email"),
   // 備考カラム追加
-  customerNote:  text("customer_note"),
+  customerNote:          text("customer_note"),
   // 人数保持するカラム追加
-  customerCount: integer("customer_count").default(1),
+  customerCount:         integer("customer_count").default(1),
   // 日時指定の予約を許容するためdateとtimeのnotnullは削除
-  date:          text("date"),
-  time:          text("time"),
-  staffId:       text("staff_id").default("__shop__"),
-  courseId:      text("course_id").notNull(),
-  status:        text("status").default("confirmed"),
-  paid:          boolean("paid").default(false),
-  cancelToken:   text("cancel_token"),
-  createdAt:     timestamp("created_at").defaultNow(),
-  updatedAt:     timestamp("updated_at").defaultNow(),
+  date:                  text("date"),
+  time:                  text("time"),
+  staffId:               text("staff_id").default("__shop__"),
+  courseId:              text("course_id").notNull(),
+  status:                text("status").default("confirmed"),
+  paid:                  boolean("paid").default(false),
+  cancelToken:           text("cancel_token"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  createdAt:             timestamp("created_at").defaultNow(),
+  updatedAt:             timestamp("updated_at").defaultNow(),
 }, (t) => [
   uniqueIndex("booking_reservations_cancel_token_idx").on(t.cancelToken),
 ]);

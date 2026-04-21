@@ -120,13 +120,24 @@ async function seedShopIfEmpty(shopId: number) {
 // ─── Stripeクライアント ───
 async function getStripeClient() {
   const { default: Stripe } = await import("stripe");
-  if (process.env.STRIPE_SECRET_KEY) return new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-03-31.basil" as any });
+  if (process.env.STRIPE_SECRET_KEY)
+    return new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: "2025-03-31.basil" as any,
+    });
   const { getStripeSecretKey } = await import("../server/stripeClient");
-  return new Stripe(await getStripeSecretKey(), { apiVersion: "2025-03-31.basil" as any });
+  return new Stripe(await getStripeSecretKey(), {
+    apiVersion: "2025-03-31.basil" as any,
+  });
 }
 async function getStripePublishableKeyValue(): Promise<string> {
-  if (process.env.STRIPE_PUBLISHABLE_KEY) return process.env.STRIPE_PUBLISHABLE_KEY;
-  try { const { getStripePublishableKey } = await import("../server/stripeClient"); return await getStripePublishableKey(); } catch { return ""; }
+  if (process.env.STRIPE_PUBLISHABLE_KEY)
+    return process.env.STRIPE_PUBLISHABLE_KEY;
+  try {
+    const { getStripePublishableKey } = await import("../server/stripeClient");
+    return await getStripePublishableKey();
+  } catch {
+    return "";
+  }
 }
 
 // ─── 型変換ヘルパー ───
@@ -911,17 +922,20 @@ export function ensureSetup(): Promise<void> {
           try {
             const rows = await sql`
               UPDATE shop_menu_items SET
-                name          = COALESCE(${name          ?? null}, name),
-                price         = COALESCE(${price         ?? null}, price),
-                comment       = COALESCE(${comment       ?? null}, comment),
-                image_url     = ${imageUrl !== undefined ? imageUrl : null},
-                is_visible    = COALESCE(${isVisible     ?? null}, is_visible),
-                display_order = COALESCE(${displayOrder  ?? null}, display_order)
+                name          = COALESCE(${name ?? null}, name),
+                price         = COALESCE(${price ?? null}, price),
+                comment       = COALESCE(${comment ?? null}, comment),
+                image_url     = COALESCE(${imageUrl !== undefined ? imageUrl : null}, image_url),
+                is_visible    = COALESCE(${isVisible !== undefined ? isVisible : null}, is_visible),
+                display_order = COALESCE(${displayOrder ?? null}, display_order)
               WHERE id = ${id} AND shop_id = ${shopId}
               RETURNING *`;
             if (!rows[0]) return res.status(404).json({ message: "Not found" });
             res.json(rows[0]);
-          } catch { res.status(500).json({ message: "Failed to update menu item" }); }
+          } catch (e) {
+            console.error(e);
+            res.status(500).json({ message: "Failed to update menu item" });
+          }
         });
 
         app.delete("/api/shops/:shopId/menu-items/:id", async (req, res) => {
@@ -1391,12 +1405,13 @@ export function ensureSetup(): Promise<void> {
             staffId,
             courseId,
             status,
-            lineProfile
+            lineProfile,
+            stripePaymentIntentId
           } = req.body;
           if (!customerName || !courseId)
             return res.status(400).json({ message: "Missing required fields" });
           const token = crypto.randomUUID().replace(/-/g, "");
-          await sql`INSERT INTO booking_reservations (shop_id,customer_name,customer_phone,customer_email,customer_note,customer_count,date,time,staff_id,course_id,status,paid,cancel_token) VALUES (${shopId},${customerName},${customerPhone || null},${customerEmail || null},${customerNote || null},${partySize || null},${date},${time},${staffId || "__shop__"},${courseId.toString()},${status},false,${token})`;
+          await sql`INSERT INTO booking_reservations (shop_id,customer_name,customer_phone,customer_email,customer_note,customer_count,date,time,staff_id,course_id,status,paid,cancel_token, stripe_payment_intent_id) VALUES (${shopId},${customerName},${customerPhone || null},${customerEmail || null},${customerNote || null},${partySize || null},${date},${time},${staffId || "__shop__"},${courseId.toString()},${status},false,${token},${stripePaymentIntentId})`;
           const rows = await sql`SELECT * FROM booking_reservations WHERE cancel_token = ${token}`;
           const newReservation = rows[0];
           if (!newReservation)
@@ -1438,21 +1453,66 @@ export function ensureSetup(): Promise<void> {
 
 
       app.put("/api/shops/:shopId/reservations", async (req, res) => {
-        const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({message:"Invalid shop ID"});
+        const shopId = parseInt(req.params.shopId);
+        if (isNaN(shopId))
+          return res.status(400).json({ message: "Invalid shop ID" });
         try {
-          const {id,status,paid,customerName,customerPhone,customerEmail,date,time}=req.body;
-          const resId=parseInt(id); if (isNaN(resId)) return res.status(400).json({message:"Invalid reservation ID"});
-          if (status!==undefined) await sql`UPDATE booking_reservations SET status=${status}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
-          if (paid!==undefined) await sql`UPDATE booking_reservations SET paid=${paid}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
-          if (customerName!==undefined) await sql`UPDATE booking_reservations SET customer_name=${customerName}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
-          if (customerPhone!==undefined) await sql`UPDATE booking_reservations SET customer_phone=${customerPhone}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
-          if (customerEmail!==undefined) await sql`UPDATE booking_reservations SET customer_email=${customerEmail}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
-          if (date!==undefined) await sql`UPDATE booking_reservations SET date=${date}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
-          if (time!==undefined) await sql`UPDATE booking_reservations SET time=${time}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
-          const rows=await sql`SELECT * FROM booking_reservations WHERE id=${resId} AND shop_id=${shopId}`;
-          if (!rows[0]) return res.status(404).json({message:"Reservation not found"});
+          const {
+            id,
+            status,
+            paid,
+            customerName,
+            customerPhone,
+            customerEmail,
+            date,
+            time,
+          } = req.body;
+          const resId = parseInt(id);
+          if (isNaN(resId))
+            return res.status(400).json({ message: "Invalid reservation ID" });
+          if (status !== undefined)
+            await sql`UPDATE booking_reservations SET status=${status}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
+          if (paid !== undefined) 
+            await sql`UPDATE booking_reservations SET paid=${paid}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
+          if (customerName !== undefined)
+            await sql`UPDATE booking_reservations SET customer_name=${customerName}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
+          if (customerPhone !== undefined)
+            await sql`UPDATE booking_reservations SET customer_phone=${customerPhone}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
+          if (customerEmail !== undefined)
+            await sql`UPDATE booking_reservations SET customer_email=${customerEmail}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
+          if (date !== undefined)
+            await sql`UPDATE booking_reservations SET date=${date}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
+          if (time !== undefined)
+            await sql`UPDATE booking_reservations SET time=${time}, updated_at=NOW() WHERE id=${resId} AND shop_id=${shopId}`;
+          const rows =
+            await sql `SELECT br.*, s.stripe_connect_id FROM booking_reservations as br JOIN shops as s ON s.id = br.shop_id WHERE br.id=${resId} AND br.shop_id=${shopId}`;
+          if (!rows[0])
+            return res.status(404).json({ message: "Reservation not found" });
+          const newStatus = rows[0].status;
+          const isPaid = rows[0].paid
+          if (newStatus === "cancelled" && isPaid === true) {
+            let refundId: string | null = null;
+            const paymentId = rows[0].stripe_payment_intent_id;
+            const shopStripeId = rows[0]?.stripe_connect_id;
+            if (paymentId) {
+              try {
+                const stripe = await getStripeClient();
+                const refundOpts = shopStripeId ? { stripeAccount: shopStripeId } : undefined;
+                const refund = await stripe.refunds.create({ payment_intent: paymentId }, refundOpts as any);
+                refundId = refund.id;
+                console.log(`Stripe refund created: ${refundId} for pi: ${paymentId} on account: ${shopStripeId}`);
+                await sql`UPDATE booking_reservations SET paid=false, updated_at=NOW() WHERE id=${resId}`;
+                rows[0].paid = false;
+              } catch (refundErr: any) {
+                console.warn("Stripe refund failed (continuing cancel):", refundErr.message);
+              }
+            }
+          }
           res.json(toReservation(rows[0]));
-        } catch (e: any) { console.error("res update error:", e); res.status(500).json({message:"Failed to update reservation"}); }
+        } catch (e: any) {
+          console.error("res update error:", e);
+          res.status(500).json({ message: "Failed to update reservation" });
+        }
       });
 
       // ─── キャンセル ───
@@ -1466,9 +1526,7 @@ export function ensureSetup(): Promise<void> {
           if (parseInt(cnt[0]?.cnt || "0") === 0)
             return res.status(404).json({ message: "Reservation not found" });
           const rows =
-            await sql`SELECT r.*, c.name as course_name, c.duration as course_duration, c.price as course_price, bs.cancel_limit_days as cancel_limit FROM booking_reservations r LEFT JOIN booking_courses c ON c.id::text = r.course_id AND c.shop_id = r.shop_id LEFT JOIN booking_settings bs ON r.shop_id = bs.shop_id WHERE r.cancel_token = ${req.params.token} AND r.shop_id = ${shopId};`;
-            // await sql`SELECT r.*, c.name as course_name, c.duration as course_duration, c.price as course_price FROM booking_reservations r LEFT JOIN booking_courses c ON c.id::text = r.course_id AND c.shop_id = ${shopId} WHERE r.cancel_token=${req.params.token} AND r.shop_id=${shopId}`;
-          
+            await sql`SELECT r.*, c.name as course_name, c.duration as course_duration, c.price as course_price, bs.cancel_limit_days as cancel_limit FROM booking_reservations r LEFT JOIN booking_courses c ON c.id::text = r.course_id AND c.shop_id = r.shop_id LEFT JOIN booking_settings bs ON r.shop_id = bs.shop_id WHERE r.cancel_token = ${req.params.token} AND r.shop_id = ${shopId}`;
             if (!rows[0])
             return res.status(404).json({ message: "Reservation not found" });
           const r = rows[0];
@@ -1482,22 +1540,46 @@ export function ensureSetup(): Promise<void> {
             courseDuration: r.course_duration || 60,
             coursePrice: r.course_price || 0,
             status: r.status,
-            cancelLimit: r.cancel_limit
+            cancelLimit: r.cancel_limit,
+            partySize: r.customer_count
           });
         } catch {
           res.status(500).json({ message: "Failed to fetch reservation" });
         }
       });
+
       app.post("/api/shops/:shopId/cancel/:token", async (req, res) => {
-        const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({message:"Invalid shop ID"});
+        const shopId = parseInt(req.params.shopId);
+        if (isNaN(shopId))
+          return res.status(400).json({ message: "Invalid shop ID" });
         try {
-          const cnt=await sql`SELECT COUNT(*) as cnt FROM booking_reservations WHERE cancel_token=${req.params.token} AND shop_id=${shopId}`;
-          if (parseInt(cnt[0]?.cnt||"0")===0) return res.status(404).json({message:"Reservation not found"});
-          const rows=await sql`SELECT status FROM booking_reservations WHERE cancel_token=${req.params.token} AND shop_id=${shopId}`;
-          if (rows[0]?.status==="cancelled") return res.json({ok:true,already:true});
+          const rows =
+            await sql `SELECT br.status, br.stripe_payment_intent_id, s.stripe_connect_id FROM booking_reservations as br JOIN shops as s ON s.id=br.shop_id WHERE cancel_token=${req.params.token} AND shop_id=${shopId}`;
+          if (rows.length === 0) 
+            return res.status(404).json({message:"Reservation not found"});
+          if (rows[0]?.status === "cancelled")
+            return res.json({ ok: true, already: true });
+
+          let refundId: string | null = null;
+          const paymentId = rows[0]?.stripe_payment_intent_id;
+          const shopStripeId = rows[0]?.stripe_connect_id;
+          if (paymentId) {
+            try {
+              const stripe = await getStripeClient();
+              const refundOpts = shopStripeId ? { stripeAccount: shopStripeId } : undefined;
+              const refund = await stripe.refunds.create({ payment_intent: paymentId }, refundOpts as any);
+              refundId = refund.id;
+              console.log(`Stripe refund created: ${refundId} for pi: ${paymentId} on account: ${shopStripeId}`);
+            } catch (refundErr: any) {
+              console.warn("Stripe refund failed (continuing cancel):", refundErr.message);
+            }
+          }
+
           await sql`UPDATE booking_reservations SET status='cancelled' WHERE cancel_token=${req.params.token} AND shop_id=${shopId}`;
-          res.json({ok:true});
-        } catch { res.status(500).json({message:"Failed to cancel reservation"}); }
+          res.json({ok:true, refunded: !!refundId, refundId});
+        } catch {
+          res.status(500).json({ message: "Failed to cancel reservation" });
+        }
       });
 
       // ─── 問い合わせ ───
@@ -1505,7 +1587,13 @@ export function ensureSetup(): Promise<void> {
       app.get("/api/shops/:shopId/inquiries", async (_req, res) => res.json([]));
 
       // ─── Stripe ───
-      app.get("/api/stripe/config", async (_req, res) => { try { res.json({publishableKey:await getStripePublishableKeyValue()}); } catch { res.json({publishableKey:""}); } });
+      app.get("/api/stripe/config", async (_req, res) => {
+        try {
+          res.json({ publishableKey: await getStripePublishableKeyValue() });
+        } catch {
+          res.json({ publishableKey: "" });
+        }
+      });
       app.get("/api/stripe/connect/status/:shopId", async (req, res) => {
         try {
           const shopId=parseInt(req.params.shopId);
@@ -1520,30 +1608,111 @@ export function ensureSetup(): Promise<void> {
           } catch { return res.json({shopId,accountId:shop.stripe_connect_id,status:shop.stripe_connect_status||"pending",connected:shop.stripe_connect_status==="active"}); }
         } catch (e: any) { res.status(500).json({error:e.message}); }
       });
+
       app.post("/api/stripe/connect/payment-intent", async (req, res) => {
         try {
-          const {shopId,amount,courseId,courseName}=req.body; if (!shopId||!amount) return res.status(400).json({error:"shopId and amount required"});
-          const rows=await sql`SELECT id,name,stripe_connect_id FROM shops WHERE id=${shopId}`;
-          if (!rows.length) return res.status(404).json({error:"Shop not found"});
-          const shop=rows[0]; if (!shop.stripe_connect_id) return res.status(400).json({error:"この店舗はStripe Connect未設定です"});
-          const stripe=await getStripeClient();
-          let pi; try { pi=await stripe.paymentIntents.create({amount:Math.round(amount),currency:"jpy",payment_method_types:["card"],description:courseName||"コース予約",on_behalf_of:shop.stripe_connect_id,transfer_data:{destination:shop.stripe_connect_id},metadata:{shop_id:String(shopId),shop_name:shop.name,course_id:courseId||"",course_name:courseName||""}}); }
-          catch (ce: any) { console.warn("Stripe Connect fallback:",ce.code); pi=await stripe.paymentIntents.create({amount:Math.round(amount),currency:"jpy",payment_method_types:["card"],description:courseName||"コース予約",metadata:{shop_id:String(shopId),shop_name:shop.name,course_id:courseId||"",course_name:courseName||"",note:"pending_onboarding_fallback"}}); }
-          res.json({clientSecret:pi.client_secret});
-        } catch (e: any) { console.error("PaymentIntent error:",e.message); res.status(500).json({error:e.message}); }
+          const { shopId, amount, courseId, courseName } = req.body;
+          if (!shopId || !amount)
+            return res
+              .status(400)
+              .json({ error: "shopId and amount required" });
+          const rows =
+            await sql`SELECT id,name,stripe_connect_id FROM shops WHERE id=${shopId}`;
+          if (!rows.length)
+            return res.status(404).json({ error: "Shop not found" });
+          const shop = rows[0];
+          if (!shop.stripe_connect_id)
+            return res
+              .status(400)
+              .json({ error: "この店舗はStripe Connect未設定です" });
+          const stripe = await getStripeClient();
+          let pi;
+          try {
+            pi = await stripe.paymentIntents.create(
+              {
+                amount: Math.round(amount),
+                currency: "jpy",
+                payment_method_types: ["card"],
+                description: courseName || "コース予約",
+                metadata: {
+                  shop_id: String(shopId),
+                  shop_name: shop.name,
+                  course_id: courseId || "",
+                  course_name: courseName || "",
+                },
+              },
+              {
+                stripeAccount: shop.stripe_connect_id,
+              }
+            );
+          } catch (ce: any) {
+            console.warn("Stripe Connect fallback:", ce.code);
+            pi = await stripe.paymentIntents.create({
+              amount: Math.round(amount),
+              currency: "jpy",
+              payment_method_types: ["card"],
+              description: courseName || "コース予約",
+              metadata: {
+                shop_id: String(shopId),
+                shop_name: shop.name,
+                course_id: courseId || "",
+                course_name: courseName || "",
+                note: "pending_onboarding_fallback",
+              },
+            });
+          }
+          res.json({
+            clientSecret: pi.client_secret,
+            shopStripeId: shop.stripe_connect_id,
+          });
+        } catch (e: any) {
+          console.error("PaymentIntent error:", e.message);
+          res.status(500).json({ error: e.message });
+        }
       });
       app.post("/api/stripe/connect/onboard/:shopId", async (req, res) => {
         try {
-          const shopId=req.params.shopId;
-          const rows=await sql`SELECT id,name,stripe_connect_id FROM shops WHERE id=${shopId}`;
-          if (!rows.length) return res.status(404).json({error:"Shop not found"});
-          const shop=rows[0]; const stripe=await getStripeClient(); let accountId=shop.stripe_connect_id;
-          if (!accountId) { const account=await stripe.accounts.create({type:"express",country:"JP",capabilities:{card_payments:{requested:true},transfers:{requested:true}}}); accountId=account.id; await sql`UPDATE shops SET stripe_connect_id=${accountId},stripe_connect_status='pending' WHERE id=${shopId}`; }
-          else { await stripe.accounts.update(accountId,{capabilities:{card_payments:{requested:true},transfers:{requested:true}}}); }
-          const domain=process.env.VERCEL_URL?`https://${process.env.VERCEL_URL}`:(process.env.APP_URL||"https://linemini-reserve-app.vercel.app");
-          const link=await stripe.accountLinks.create({account:accountId,refresh_url:`${domain}/admin/shop/${shopId}`,return_url:`${domain}/admin/shop/${shopId}`,type:"account_onboarding"});
-          res.json({url:link.url});
-        } catch (e: any) { console.error("Onboard error:",e.message); res.status(500).json({error:e.message}); }
+          const shopId = req.params.shopId;
+          const rows =
+            await sql`SELECT id,name,stripe_connect_id FROM shops WHERE id=${shopId}`;
+          if (!rows.length)
+            return res.status(404).json({ error: "Shop not found" });
+          const shop = rows[0];
+          const stripe = await getStripeClient();
+          let accountId = shop.stripe_connect_id;
+          if (!accountId) {
+            const account = await stripe.accounts.create({
+              type: "express",
+              country: "JP",
+              capabilities: {
+                card_payments: { requested: true },
+                transfers: { requested: true },
+              },
+            });
+            accountId = account.id;
+            await sql`UPDATE shops SET stripe_connect_id=${accountId},stripe_connect_status='pending' WHERE id=${shopId}`;
+          } else {
+            await stripe.accounts.update(accountId, {
+              capabilities: {
+                card_payments: { requested: true },
+                transfers: { requested: true },
+              },
+            });
+          }
+          const domain = process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : process.env.APP_URL || "https://linemini-reserve-app.vercel.app";
+          const link = await stripe.accountLinks.create({
+            account: accountId,
+            refresh_url: `${domain}/admin/shop/${shopId}`,
+            return_url: `${domain}/admin/shop/${shopId}`,
+            type: "account_onboarding",
+          });
+          res.json({ url: link.url });
+        } catch (e: any) {
+          console.error("Onboard error:", e.message);
+          res.status(500).json({ error: e.message });
+        }
       });
       app.post("/api/stripe/connect/dashboard/:shopId", async (req, res) => {
         try {

@@ -4,16 +4,19 @@
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #333; line-height: 1.6; background-color: #f9f9f9; padding: 20px; }
         .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; }
-        .header { background-color: #4a90e2; color: #ffffff; padding: 25px 20px; text-align: center; }
+        /* リクエスト中は「受付」をイメージするオレンジ系に */
+        .header { background-color: #f39c12; color: #ffffff; padding: 25px 20px; text-align: center; }
         .header h1 { margin: 0; font-size: 20px; }
         .content { padding: 30px 20px; }
+        .status-box { background-color: #fff4e5; border: 1px solid #ffe5b4; border-radius: 6px; padding: 15px; margin-bottom: 25px; text-align: center; color: #856404; font-weight: bold; }
         .info-card { background-color: #f8f9fa; border-radius: 6px; padding: 20px; margin-bottom: 25px; }
         .info-item { margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
         .info-item:last-child { border-bottom: none; }
         .label { font-weight: bold; color: #666; width: 80px; display: inline-block; }
         .value { color: #333; font-weight: 500; }
         
-        /* キャンセルボタンのスタイル */
+        .footer { font-size: 12px; color: #bbb; text-align: center; padding: 20px; }
+        .note { font-size: 14px; color: #666; background-color: #eee; padding: 10px; border-radius: 4px; }
         .cancel-section { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; }
         .cancel-button { 
             display: inline-block; padding: 12px 24px; background-color: #ffffff; color: #d9534f; 
@@ -21,51 +24,51 @@
             transition: all 0.3s;
         }
         .cancel-note { font-size: 12px; color: #999; margin-top: 10px; }
-        .footer { font-size: 12px; color: #bbb; text-align: center; padding: 20px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>ご予約ありがとうございます</h1>
+            <h1>予約リクエストを受け付けました</h1>
         </div>
         
         <div class="content">
             <p>{{customer_name}} 様</p>
-            <p>この度はご予約いただき誠にありがとうございます。<br>以下の内容で承りましたので、内容をご確認ください。</p>
+
+            <p>この度は予約リクエストをいただき誠にありがとうございます。<br>
+            店舗からご連絡を差し上げますのでお待ちください。</p>
 
             <div class="info-card">
                 <div class="info-item">
-                    <span class="label">店舗</span>
+                    <span class="label">予約店舗</span>
                     <span class="value">{{shop_name}}</span>
                 </div>
                 <div class="info-item">
-                    <span class="label">日時</span>
-                    <span class="value">{{date}} {{time}} 〜</span>
-                </div>
-                <div class="info-item">
-                    <span class="label">コース</span>
+                    <span class="label">予約コース</span>
                     <span class="value">{{course_name}}</span>
                 </div>
                 <div class="info-item">
-                    <span class="label">人数</span>
+                    <span class="label">予約人数</span>
                     <span class="value">{{customer_count}}名</span>
                 </div>
                 <div class="info-item">
                     <span class="label">備考</span>
-                    <span class="value">{{customer_memo}}名</span>
+                    <span class="value">{{customer_memo}}</span>
                 </div>
             </div>
 
-            <p>当日のご来店をスタッフ一同、心よりお待ちしております。</p>
-
+            <div class="note">
+                <strong>【ご注意事項】</strong><br>
+                ・店舗の状況により、ご希望に添えない場合がございます。<br>
+            </div>
             <div class="cancel-section">
                 <p style="font-size: 14px; color: #666;">キャンセルはこちら</p>
                 <a href="https://3464-2404-7a80-2b40-dc00-ddac-6b3e-cab8-4f2d.ngrok-free.app/web/cancel/{{shop_id}}/{{reservation_token}}" class="cancel-button">
                     予約をキャンセルする
                 </a>
                 <p class="cancel-note">
-                    ※キャンセルの有効期限は予約日の前日までとなります。<br>
+                    ※リクエスト中の段階でも上記ボタンよりリクエストキャンセルは可能です。<br>
+                    ※予約確定後のキャンセルの有効期限は予約日の前日までとなります。<br>
                     それ以降の変更はお電話にてご連絡ください。
                 </p>
             </div>
