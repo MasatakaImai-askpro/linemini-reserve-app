@@ -1,8 +1,7 @@
 import { db } from "./db";
-import {sql} from "drizzle-orm"
 import { areas, categories, subCategories, shops, coupons, shopCategories, users } from "../shared/schema";
 import crypto from "crypto";
-  function nanoid(n = 10) { return crypto.randomBytes(Math.ceil(n * 3 / 4)).toString("base64url").slice(0, n); }
+function nanoid(n = 10) { return crypto.randomBytes(Math.ceil(n * 3 / 4)).toString("base64url").slice(0, n); }
 import bcrypt from "bcryptjs";
 
 // ─────────────────────────────
@@ -472,9 +471,6 @@ export async function seedDatabase() {
         }
       }
     }
-    await db.execute(
-      sql`UPDATE shops SET "reservation_url" = CONCAT('/reservation/', id::text) WHERE "reservation_url" IS NULL`
-    );
     console.log(`Seeded ${seedShops.length} shops`);
   } else {
     console.log(`Shops already exist (${existingShops.length}), skipping...`);

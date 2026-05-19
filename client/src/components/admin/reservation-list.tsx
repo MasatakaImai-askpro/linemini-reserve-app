@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { fetchReservations, fetchStaff, fetchCourses, updateReservation, formatPrice, type Staff, type Course, type Reservation } from "@/lib/booking-api";
+import { fetchReservations, fetchStaff, fetchCourses, updateReservation, deleteReservation, formatPrice, type Staff, type Course, type Reservation } from "@/lib/booking-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Ban, Pencil, Trash2, FileText, SquareArrowOutUpRight } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, Ban, Pencil, Trash2, MessageSquare } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -29,7 +30,8 @@ export function ReservationList({ shopId }: { shopId: number }) {
   const [loading, setLoading] = useState(true);
   const [cancelTarget, setCancelTarget] = useState<Reservation | null>(null);
   const [cancelling, setCancelling] = useState(false);
-  const [viewNoteTarget, setViewNoteTarget] = useState<Reservation | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Reservation | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [editTarget, setEditTarget] = useState<Reservation | null>(null);
   const [editForm, setEditForm] = useState({
     customerName: "",
@@ -40,30 +42,18 @@ export function ReservationList({ shopId }: { shopId: number }) {
     staffId: "",
     courseId: "",
     status: "pending" as string,
+    notes: "",
   });
   const [saving, setSaving] = useState(false);
 
   const reload = async () => {
-    const [r, s, c] = await Promise.all([
-      fetchReservations(shopId),
-      fetchStaff(shopId),
-      fetchCourses(shopId),
-    ]);
+    const [r, s, c] = await Promise.all([fetchReservations(shopId), fetchStaff(shopId), fetchCourses(shopId)]);
     setReservations(r);
     setStaffList(s);
     setCourseList(c);
   };
 
-  useEffect(() => {
-    setLoading(true);
-    reload()
-      .catch(() => {
-        setReservations([]);
-        setStaffList([]);
-        setCourseList([]);
-      })
-      .finally(() => setLoading(false));
-  }, [shopId]);
+  useEffect(() => { setLoading(true); reload().catch(() => { setReservations([]); setStaffList([]); setCourseList([]); }).finally(() => setLoading(false)); }, [shopId]);
 
   const handleCancel = async () => {
     if (!cancelTarget) return;
@@ -72,6 +62,15 @@ export function ReservationList({ shopId }: { shopId: number }) {
     await reload();
     setCancelTarget(null);
     setCancelling(false);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    await deleteReservation(shopId, deleteTarget.id);
+    await reload();
+    setDeleteTarget(null);
+    setDeleting(false);
   };
 
   const openEdit = (res: Reservation) => {
@@ -85,6 +84,7 @@ export function ReservationList({ shopId }: { shopId: number }) {
       staffId: res.staffId,
       courseId: res.courseId,
       status: res.status,
+      notes: res.notes || "",
     });
   };
 
@@ -104,6 +104,7 @@ export function ReservationList({ shopId }: { shopId: number }) {
       courseId: editForm.courseId,
       status: editForm.status,
       paid: !!courseList.find(c => c.id === editForm.courseId)?.prepaymentOnly,
+      notes: editForm.notes,
     });
     await reload();
     setEditTarget(null);
@@ -132,12 +133,10 @@ export function ReservationList({ shopId }: { shopId: number }) {
               <TableHead>予約日時</TableHead>
               <TableHead>お客様名</TableHead>
               <TableHead>コース</TableHead>
-              <TableHead>人数</TableHead>
-              <TableHead>担当者</TableHead>
+              <TableHead>備考</TableHead>
               <TableHead className="text-right">料金</TableHead>
               <TableHead className="text-center">決済</TableHead>
               <TableHead className="text-center">ステータス</TableHead>
-              <TableHead className="text-center">備考</TableHead>
               <TableHead className="w-[120px] text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -146,20 +145,14 @@ export function ReservationList({ shopId }: { shopId: number }) {
               const staff = staffList.find((s) => s.id === res.staffId);
               const course = courseList.find((c) => c.id === res.courseId);
               const status = STATUS_MAP[res.status as keyof typeof STATUS_MAP] || STATUS_MAP.pending;
-              const parsedDate = res.date ? parseISO(res.date) : null;
+              const parsedDate = parseISO(res.date);
               const isCancelled = res.status === "cancelled";
 
               return (
                 <TableRow key={res.id} className={isCancelled ? "opacity-50" : ""} data-testid={`reservation-row-${res.id}`}>
                   <TableCell className="font-medium text-foreground">
-                    {parsedDate ? (
-                      <>
-                        <div>{format(parsedDate, "M/d(E)", { locale: ja })}</div>
-                        <div className="text-xs text-muted-foreground">{res.time}</div>
-                      </>
-                    ) : (
-                      <div className="text-sm font-medium">リクエスト予約</div>
-                    )}
+                    <div>{format(parsedDate, "M/d(E)", { locale: ja })}</div>
+                    <div className="text-xs text-muted-foreground">{res.time}</div>
                   </TableCell>
                   <TableCell className="text-foreground">
                     <div>{res.customerName}</div>
@@ -167,8 +160,16 @@ export function ReservationList({ shopId }: { shopId: number }) {
                     {res.customerPhone && <div className="text-[10px] text-muted-foreground">{res.customerPhone}</div>}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{course?.name || "-"}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{res.customerCount || "-"}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{staff?.name || "-"}</TableCell>
+                  <TableCell className="max-w-[180px]">
+                    {res.notes ? (
+                      <div className="flex items-start gap-1 text-xs text-muted-foreground">
+                        <MessageSquare className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
+                        <span className="line-clamp-2" data-testid={`text-notes-${res.id}`}>{res.notes}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right font-medium text-foreground">
                     {course ? formatPrice(course.price) : "-"}
                   </TableCell>
@@ -182,20 +183,6 @@ export function ReservationList({ shopId }: { shopId: number }) {
                   <TableCell className="text-center">
                     <Badge className={status.className}>{status.label}</Badge>
                   </TableCell>
-                  <TableCell className="text-center">
-                    {res.customerNote ? (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-muted-foreground hover:text-primary"
-                        onClick={() => setViewNoteTarget(res)}
-                      >
-                        <SquareArrowOutUpRight className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <span className="text-muted-foreground/30">—</span>
-                    )}
-                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(res)} data-testid={`button-edit-reservation-${res.id}`}>
@@ -206,6 +193,9 @@ export function ReservationList({ shopId }: { shopId: number }) {
                           <Ban className="h-3.5 w-3.5" />
                         </Button>
                       )}
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(res)} data-testid={`button-delete-reservation-${res.id}`}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -214,30 +204,6 @@ export function ReservationList({ shopId }: { shopId: number }) {
           </TableBody>
         </Table>
       </div>
-
-      <Dialog open={!!viewNoteTarget} onOpenChange={(open) => { if (!open) setViewNoteTarget(null); }}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              備考内容の確認
-            </DialogTitle>
-            <DialogDescription>
-              {viewNoteTarget?.customerName} 様の予約備考
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="mt-4 rounded-md bg-muted p-4 text-sm leading-relaxed text-foreground">
-            {viewNoteTarget?.customerNote || "備考はありません。"}
-          </div>
-
-          <DialogFooter className="mt-6">
-            <Button variant="outline" onClick={() => setViewNoteTarget(null)} className="w-full sm:w-auto">
-              閉じる
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!cancelTarget} onOpenChange={(open) => { if (!open) setCancelTarget(null); }}>
         <DialogContent>
@@ -255,6 +221,21 @@ export function ReservationList({ shopId }: { shopId: number }) {
             <Button variant="outline" onClick={() => setCancelTarget(null)}>戻る</Button>
             <Button variant="destructive" onClick={handleCancel} disabled={cancelling}>
               {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : "キャンセルする"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>予約を削除しますか？</DialogTitle>
+            <DialogDescription>この操作は元に戻せません。</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>戻る</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "削除する"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -285,7 +266,7 @@ export function ReservationList({ shopId }: { shopId: number }) {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-foreground">時間</label>
-                <Input type="time" value={editForm.time} onChange={(e) => setEditForm({ ...editForm, time: e.target.value })} placeholder="10:00" data-testid="input-edit-time" />
+                <Input value={editForm.time} onChange={(e) => setEditForm({ ...editForm, time: e.target.value })} placeholder="10:00" data-testid="input-edit-time" />
               </div>
             </div>
             <div>
@@ -326,6 +307,20 @@ export function ReservationList({ shopId }: { shopId: number }) {
               <div className="text-sm text-muted-foreground" data-testid="text-edit-payment-method">
                 {courseList.find(c => c.id === editForm.courseId)?.prepaymentOnly ? "事前決済" : "当日払い"}
               </div>
+            </div>
+            <div>
+              <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <MessageSquare className="h-3.5 w-3.5" />
+                備考・ご要望
+              </label>
+              <Textarea
+                value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                placeholder="備考・ご要望を入力"
+                rows={3}
+                className="resize-none text-sm"
+                data-testid="input-edit-notes"
+              />
             </div>
           </div>
           <DialogFooter>

@@ -204,6 +204,13 @@ function LineHeader() {
               <Home className="w-3.5 h-3.5 text-gray-500" />
             </button>
           )}
+          <button
+            onClick={() => navigate("/line")}
+            className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+            data-testid="button-line-close"
+          >
+            <X className="w-3.5 h-3.5 text-gray-500" />
+          </button>
         </div>
       </div>
       {walletOpen && <CouponWalletModal onClose={() => setWalletOpen(false)} />}
@@ -222,15 +229,13 @@ function LineBottomBar() {
 }
 
 export default function LineAppFrame({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
-  const isHome = location === "/app";
   return (
-    <div className="h-dvh bg-gray-800 flex items-start justify-center md:py-8 md:px-4 overflow-hidden" data-testid="line-app-frame">
+    <div className="h-dvh bg-white flex items-start justify-center md:py-8 md:px-4 overflow-hidden" data-testid="line-app-frame">
       <div className="w-full md:max-w-[375px] md:rounded-[2.5rem] md:overflow-hidden md:shadow-2xl md:border-4 md:border-gray-700 relative bg-background h-full md:h-[min(812px,calc(100dvh-4rem))] flex flex-col">
         <div className="hidden md:block">
           <LineStatusBar />
         </div>
-        {!isHome && <LineHeader />}
+        <LineHeader />
         <div className="flex-1 overflow-y-auto overflow-x-hidden" data-testid="line-app-content">
           {children}
         </div>

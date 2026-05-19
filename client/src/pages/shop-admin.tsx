@@ -6,7 +6,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useLogout } from "@/hooks/use-auth";
 import {
   Store,
@@ -27,12 +26,6 @@ import {
   CircleDashed,
   ExternalLink,
   Unlink,
-  Phone,
-  Mail,
-  MapPin,
-  CalendarOff,
-  FileText,
-  Loader2
 } from "lucide-react";
 import { SiStripe } from "react-icons/si";
 import type { Shop } from "@shared/schema";
@@ -45,154 +38,7 @@ import { ReservationList } from "@/components/admin/reservation-list";
 import { MenuManagement } from "@/components/admin/menu-management";
 import { fetchSettings, updateSettings } from "@/lib/booking-api";
 
-type ShopAdminTab = "stores" | "images" | "menu" | "courses" | "staff" | "slots" | "reservations" | "settings" | "payment";
-
-function StoreInfoSettings({ shopId }: { shopId: number }) {
-  const { toast } = useToast();
-  const [loaded, setLoaded] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  // 店舗情報専用のState
-  const [storeName, setStoreName] = useState("");
-  const [storeDescription, setStoreDescription] = useState("");
-  const [storeAddress, setStoreAddress] = useState("");
-  const [storePhone, setStorePhone] = useState("");
-  const [storeEmail, setStoreEmail] = useState("");
-  const [storeHours, setStoreHours] = useState("");
-  const [storeClosedDays, setStoreClosedDays] = useState("");
-
-  useEffect(() => {
-    // 既存の取得関数を流用
-    fetchSettings(shopId).then((s) => {
-      setStoreName(s.store_name ?? "");
-      setStoreDescription(s.store_description ?? "");
-      setStoreAddress(s.store_address ?? "");
-      setStorePhone(s.store_phone ?? "");
-      setStoreEmail(s.store_email ?? "");
-      setStoreHours(s.store_hours ?? "");
-      setStoreClosedDays(s.store_closed_days ?? "");
-      setLoaded(true);
-    });
-  }, [shopId]);
-
-  // useEffect(() => {
-  //   // 既存の取得関数を流用
-  //   fetchSettings(shopId).then((s) => {
-  //     setStoreName(s.shop_info_name ?? "");
-  //     setStoreDescription(s.shop_info_description ?? "");
-  //     setStoreAddress(s.shop_info_address ?? "");
-  //     setStorePhone(s.shop_info_phone ?? "");
-  //     setStoreEmail(s.store_email ?? "");
-  //     setStoreHours(s.shop_info_hours ?? "");
-  //     setStoreClosedDays(s.store_closed_days ?? "");
-  //     setLoaded(true);
-  //   });
-  // }, [shopId]);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await updateSettings(shopId, {
-        store_name: storeName,
-        store_description: storeDescription,
-        store_address: storeAddress,
-        store_phone: storePhone,
-        store_email: storeEmail,
-        store_hours: storeHours,
-        store_closed_days: storeClosedDays,
-      });
-      toast({ title: "店舗情報を更新しました" });
-    } catch {
-      toast({ title: "保存に失敗しました", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (!loaded) return <div className="py-10 text-center text-muted-foreground text-sm">読み込み中...</div>;
-
-  return (
-    <div data-testid="admin-shop-info-settings" className="space-y-4">
-      <div className="mb-4">
-        <h2 className="text-lg font-bold text-foreground">店舗情報の設定</h2>
-        <p className="text-sm text-muted-foreground">予約ページに表示される店舗の基本情報を編集</p>
-      </div>
-
-      <Card className="p-5 space-y-6">
-        {/* 基本情報セクション */}
-        <div className="grid gap-6 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="storeName" className="flex items-center gap-1.5 text-sm font-semibold">
-              <Store className="h-4 w-4 text-primary" /> 店名
-            </Label>
-            <Input id="storeName" value={storeName} onChange={(e) => setStoreName(e.target.value)} placeholder="例: サロン・ド・サンプル" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="storePhone" className="flex items-center gap-1.5 text-sm font-semibold">
-              <Phone className="h-4 w-4 text-primary" /> 電話番号
-            </Label>
-            <Input id="storePhone" value={storePhone} onChange={(e) => setStorePhone(e.target.value)} placeholder="03-xxxx-xxxx" />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="storeEmail" className="flex items-center gap-1.5 text-sm font-semibold">
-            <Mail className="h-4 w-4 text-primary" /> メールアドレス
-          </Label>
-          <Input id="storeEmail" type="email" value={storeEmail} onChange={(e) => setStoreEmail(e.target.value)} placeholder="info@example.com" />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="storeAddress" className="flex items-center gap-1.5 text-sm font-semibold">
-            <MapPin className="h-4 w-4 text-primary" /> 住所
-          </Label>
-          <Input id="storeAddress" value={storeAddress} onChange={(e) => setStoreAddress(e.target.value)} placeholder="東京都世田谷区..." />
-        </div>
-
-        {/* 営業スケジュールセクション */}
-        <div className="grid gap-6 sm:grid-cols-2 border-t pt-5">
-          <div className="space-y-2">
-            <Label htmlFor="storeHours" className="flex items-center gap-1.5 text-sm font-semibold">
-              <Clock className="h-4 w-4 text-primary" /> 営業時間
-            </Label>
-            <Input id="storeHours" value={storeHours} onChange={(e) => setStoreHours(e.target.value)} placeholder="10:00 〜 19:00" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="storeClosedDays" className="flex items-center gap-1.5 text-sm font-semibold">
-              <CalendarOff className="h-4 w-4 text-primary" /> 定休日
-            </Label>
-            <Input id="storeClosedDays" value={storeClosedDays} onChange={(e) => setStoreClosedDays(e.target.value)} placeholder="毎週火曜日、第3日曜日" />
-          </div>
-        </div>
-
-        {/* 紹介文セクション */}
-        <div className="border-t pt-5 space-y-2">
-          <Label htmlFor="storeDescription" className="flex items-center gap-1.5 text-sm font-semibold">
-            <FileText className="h-4 w-4 text-primary" /> 店舗紹介文
-          </Label>
-          <Textarea 
-            id="storeDescription"
-            value={storeDescription} 
-            onChange={(e) => setStoreDescription(e.target.value)} 
-            placeholder="お店の特徴やコンセプトを入力してください"
-            className="min-h-[120px] resize-none"
-          />
-        </div>
-
-        <div className="pt-2">
-          <Button 
-            onClick={handleSave} 
-            disabled={saving} 
-            className="w-full sm:w-auto min-w-[140px]"
-          >
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            {saving ? "保存中..." : "店舗情報を保存"}
-          </Button>
-        </div>
-      </Card>
-    </div>
-  );
-}
+type ShopAdminTab = "images" | "menu" | "courses" | "staff" | "slots" | "reservations" | "settings" | "payment";
 
 function ImageUploadSlot({
   label,
@@ -461,7 +307,7 @@ function ShopSettingsPanel({ shopId }: { shopId: number }) {
     fetchSettings(shopId).then((s) => {
       setTableCount(s.table_count ?? "");
       setMaxPartySize(s.max_party_size ?? "");
-      setStaffSelectionEnabled(s.staff_selection_enabled === true);
+      setStaffSelectionEnabled(s.staff_selection_enabled === "true");
       setLoaded(true);
     });
   }, [shopId]);
@@ -469,17 +315,6 @@ function ShopSettingsPanel({ shopId }: { shopId: number }) {
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    const isInvalidTable = !tableCount || parseInt(tableCount) < 1;
-    const isInvalidParty = !maxPartySize || parseInt(maxPartySize) < 1;
-
-    if (isInvalidTable || isInvalidParty) {
-      toast({ 
-        title: "入力エラー", 
-        description: "卓数と上限人数には1以上の数値を入力してください。", 
-        variant: "destructive" 
-      });
-      return;
-    }
     setSaving(true);
     try {
       await updateSettings(shopId, {
@@ -525,21 +360,21 @@ function ShopSettingsPanel({ shopId }: { shopId: number }) {
             卓数（同時に受け付ける予約の最大数）
           </Label>
           <div className="flex items-center gap-3 max-w-xs">
-          <Input
-            id="table-count"
-            type="number"
-            min="0"
-            max="100"
-            value={tableCount}
-            onChange={(e) => setTableCount(e.target.value)}
-            placeholder="例: 5"
-            className="w-28"
-            data-testid="input-table-count"
-          />
+            <Input
+              id="table-count"
+              type="number"
+              min="0"
+              max="100"
+              value={tableCount}
+              onChange={(e) => setTableCount(e.target.value)}
+              placeholder="例: 5"
+              className="w-28"
+              data-testid="input-table-count"
+            />
             <span className="text-sm text-muted-foreground">卓 / 台 / 組</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            同じ時間帯に受け付ける予約の最大数です。1以上の入力が必須です。
+            同じ時間帯に受け付ける予約の最大数です。0または空欄の場合はスタッフの空き状況で制御されます。
           </p>
         </div>
 
@@ -563,8 +398,7 @@ function ShopSettingsPanel({ shopId }: { shopId: number }) {
             <span className="text-sm text-muted-foreground">名まで</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            予約確認画面で選択できる人数の上限です。1以上の入力が必須です。<br />
-            店舗のジャンルが"グルメ"の場合は予約画面で人数の選択が可能となります。
+            予約確認画面で選択できる人数の上限です。0または空欄の場合は最大20名まで選択可能です。
           </p>
         </div>
 
@@ -686,14 +520,13 @@ export default function ShopAdminPage() {
   const params = useParams<{ id: string }>();
   const shopId = parseInt(params.id || "0");
 
-  const [activeTab, setActiveTab] = useState<ShopAdminTab>("stores");
+  const [activeTab, setActiveTab] = useState<ShopAdminTab>("images");
 
   const { data: shop, isLoading } = useQuery<Shop>({
     queryKey: ["/api/shops", params.id],
   });
 
   const tabs: { id: ShopAdminTab; label: string; icon: typeof Store }[] = [
-    { id: "stores", label: "店舗管理", icon: Store },
     { id: "images", label: "画像管理", icon: ImageIcon },
     { id: "menu", label: "メニュー管理", icon: LayoutGrid },
     { id: "courses", label: "コース管理", icon: ListOrdered },
@@ -781,7 +614,7 @@ export default function ShopAdminPage() {
             );
           })}
         </div>
-        {activeTab === "stores" && <StoreInfoSettings shopId={shopId} />}
+
         {activeTab === "images" && <ImageManagement shop={shop} />}
         {activeTab === "menu" && <MenuManagement shopId={shopId} />}
         {activeTab === "courses" && <CourseManagement shopId={shopId} />}

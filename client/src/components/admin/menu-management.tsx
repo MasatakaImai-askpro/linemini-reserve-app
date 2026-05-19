@@ -215,13 +215,7 @@ function MenuItemCard({
 
   const updateMutation = useMutation({
     mutationFn: async (data: Partial<MenuItem>) => {
-      const payload = {
-        ...data,
-        is_visible: data.isVisible,
-        image_url: data.imageUrl,
-        display_order: data.displayOrder
-      };
-      await apiRequest("PUT", `/api/shops/${shopId}/menu-items/${item.id}`, payload);
+      await apiRequest("PUT", `/api/shops/${shopId}/menu-items/${item.id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shops", shopId.toString(), "menu-items"] });
@@ -358,10 +352,6 @@ function MenuItemCard({
                 variant="outline"
                 className="h-7 px-2 text-xs"
                 onClick={() => updateMutation.mutate({ isVisible: !item.isVisible } as any)}
-                // onClick={() => {
-                //   const nextValue = !item.isVisible;
-                //   updateMutation.mutate({ isVisible: nextValue });
-                // }}
                 disabled={updateMutation.isPending}
                 data-testid={`button-menu-toggle-${item.id}`}
               >
@@ -393,15 +383,7 @@ export function MenuManagement({ shopId }: { shopId: number }) {
     queryFn: async () => {
       const res = await fetch(`/api/shops/${shopId}/menu-items?all=true`);
       if (!res.ok) throw new Error("Failed to fetch");
-      const rawData = await res.json();
-      
-      return rawData.map ((item: any) => ({
-        ...item,
-        isVisible: item.is_visible,
-        imageUrl: item.image_url,
-        displayOrder: item.display_order,
-        shopId: item.shop_id
-      }))
+      return res.json();
     },
   });
 

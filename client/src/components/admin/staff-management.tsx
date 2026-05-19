@@ -25,7 +25,7 @@ export function StaffManagement({ shopId }: { shopId: number }) {
   const reload = async () => {
     const [s, settings] = await Promise.all([fetchStaff(shopId), fetchSettings(shopId)]);
     setStaffList(s);
-    setStaffEnabled(settings.staff_selection_enabled === true);
+    setStaffEnabled(settings.staff_selection_enabled === "true");
   };
 
   useEffect(() => { setLoading(true); reload().catch(() => { setStaffList([]); }).finally(() => setLoading(false)); }, [shopId]);
@@ -33,7 +33,7 @@ export function StaffManagement({ shopId }: { shopId: number }) {
   const handleToggleStaff = async (enabled: boolean) => {
     setTogglingStaff(true);
     setStaffEnabled(enabled);
-    await updateSettings(shopId, { staff_selection_enabled: enabled ? true : false });
+    await updateSettings(shopId, { staff_selection_enabled: enabled ? "true" : "false" });
     setTogglingStaff(false);
   };
 

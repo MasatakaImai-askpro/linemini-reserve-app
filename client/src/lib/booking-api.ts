@@ -14,7 +14,6 @@ export interface Course {
   price: number;
   description: string;
   prepaymentOnly: boolean;
-  enableRequestMode: boolean;
   imageUrl: string | null;
   staffIds: string[];
 }
@@ -29,8 +28,6 @@ export interface Reservation {
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
-  customerNote?: string;
-  customerCount?: number;
   date: string;
   time: string;
   staffId: string;
@@ -38,8 +35,7 @@ export interface Reservation {
   status: "confirmed" | "pending" | "cancelled";
   paid: boolean;
   partySize?: number;
-  lineProfile: string;
-  stripePaymentIntentId?: string;
+  notes?: string;
 }
 
 export interface CancelInfo {
@@ -52,8 +48,6 @@ export interface CancelInfo {
   courseDuration: number;
   coursePrice: number;
   status: string;
-  cancelLimit: number; 
-  partySize: number;
 }
 
 export const fetchCancelInfo = (shopId: number, token: string) =>
@@ -71,18 +65,9 @@ export interface StoreSettings {
   store_hours: string;
   store_closed_days: string;
   banner_url: string;
-  staff_selection_enabled: boolean;
+  staff_selection_enabled: string;
   table_count?: string;
   max_party_size?: string;
-  store_open_time?: string;
-  store_close_time?: string;
-  shop_category: string; 
-  // shop_info_name?: string;
-  // shop_info_description?:string;
-  // shop_info_address?: string;
-  // shop_info_phone?: string;
-  // shop_info_hours?: string;
-  // shop_info_closed_days?: string;
 }
 
 export const SHOP_STAFF_ID = "__shop__";
@@ -133,8 +118,11 @@ export const deleteCourse = (shopId: number, id: string) =>
 export const createReservation = (shopId: number, data: Partial<Reservation>) =>
   api(`/api/shops/${shopId}/reservations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
 
-export const updateReservation = (shopId: number, data: { id: string; status?: string; paid?: boolean; customerName?: string; customerPhone?: string; customerEmail?: string; date?: string; time?: string; staffId?: string; courseId?: string }) =>
+export const updateReservation = (shopId: number, data: { id: string; status?: string; paid?: boolean; customerName?: string; customerPhone?: string; customerEmail?: string; date?: string; time?: string; staffId?: string; courseId?: string; partySize?: number; notes?: string }) =>
   api(`/api/shops/${shopId}/reservations`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+
+export const deleteReservation = (shopId: number, id: string) =>
+  api(`/api/shops/${shopId}/reservations?id=${id}`, { method: "DELETE" });
 
 export const fetchSlots = (shopId: number, staffId: string, date?: string, courseId?: string) => {
   const params = new URLSearchParams({ staffId });
