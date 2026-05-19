@@ -1233,6 +1233,7 @@ export function ensureSetup(): Promise<void> {
             const [sh,sm]=slot.split(":").map(Number);
             const sStart=sh*60+sm;
             if (sStart+courseDuration>closeHour*60) return {time:slot,available:false};
+            if (date) { const todayJST=new Date(Date.now()+9*3600000).toISOString().slice(0,10); if (date===todayJST) { const now=new Date(Date.now()+9*3600000); const nowMin=now.getUTCHours()*60+now.getUTCMinutes(); if (nowMin>=sStart-15) return {time:slot,available:false}; } }
             if (unvaiavleTimes.has(slot)) return {time:slot,available:false};
             let max=0;
             for(let i=0;i<slotsNeeded;i++){

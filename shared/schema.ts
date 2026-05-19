@@ -8,6 +8,9 @@ import { z } from "zod";
 // ─────────────────────────────
 // ユーザー（管理者・店舗管理者）
 // ─────────────────────────────
+export const orderStatusEnum = pgEnum("order_status", ["PENDING", "PAID", "CANCELLED", "REFUNDED"]);
+export const reservationStatusEnum = pgEnum("reservation_status", ["PENDING", "CONFIRMED", "CANCELLED"]);
+
 export const userRoleEnum = pgEnum("user_role", ["admin", "shop_admin"]);
 
 export const users = pgTable("users", {
@@ -242,7 +245,93 @@ export const bookingSlots = pgTable("booking_slots", {
   uniqueIndex("booking_slots_idx").on(t.shopId, t.staffId, t.dayOfWeek, t.time),
 ]);
 
-// ─────────────────────────────
+
+  // ─────────────────────────────────────────────────────────────
+  // 旧システムテーブル（本番DBに残存・未使用）
+  // パブリッシュ時の rename ダイアログを防ぐためスキーマに保持
+  // ─────────────────────────────────────────────────────────────
+  export const storeOwners = pgTable("store_owners", {
+    id:        serial("id").primaryKey(),
+    email:     text("email").notNull(),
+    password:  text("password").notNull(),
+    shopId:    integer("shop_id").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  });
+
+  export const storeStaff = pgTable("store_staff", {
+    id:        serial("id").primaryKey(),
+    shopId:    integer("shop_id").notNull(),
+    name:      text("name").notNull(),
+    role:      text("role"),
+    iconUrl:   text("icon_url"),
+    isActive:  boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  });
+
+  export const storeServices = pgTable("store_services", {
+    id:                 serial("id").primaryKey(),
+    shopId:             integer("shop_id").notNull(),
+    name:               text("name").notNull(),
+    description:        text("description"),
+    duration:           integer("duration"),
+    price:              integer("price"),
+    requiresPrepayment: boolean("requires_prepayment").notNull().default(false),
+    isActive:           boolean("is_active").notNull().default(true),
+    imageUrl:           text("image_url"),
+    staffId:            text("staff_id").array(),
+    updatedAt:          timestamp("updated_at").notNull().defaultNow(),
+    createdAt:          timestamp("created_at").notNull().defaultNow(),
+  });
+
+  export const storeSlots = pgTable("store_slots", {
+    id:          serial("id").primaryKey(),
+    shopId:      integer("shop_id").notNull(),
+    staffId:     integer("staff_id").notNull(),
+    dayOfWeek:   integer("day_of_week").notNull(),
+    time:        text("time").notNull(),
+    isAvailable: boolean("is_available").notNull().default(true),
+    updatedAt:   timestamp("updated_at").notNull().defaultNow(),
+    createdAt:   timestamp("created_at").notNull().defaultNow(),
+  });
+
+  export const serviceCategories = pgTable("service_categories", {
+    serviceId:  integer("service_id").notNull(),
+    categoryId: integer("category_id").notNull(),
+  });
+
+  export const staffCategories = pgTable("staff_categories", {
+    staffId:    integer("staff_id").notNull(),
+    categoryId: integer("category_id").notNull(),
+  });
+
+  export const legacyReservations = pgTable("reservations", {
+    id:               serial("id").primaryKey(),
+    shopId:           integer("shop_id").notNull(),
+    serviceId:        integer("service_id"),
+    staffId:          integer("staff_id"),
+    customerName:     text("customer_name").notNull(),
+    customerPhone:    text("customer_phone"),
+    customerEmail:    text("customer_email"),
+    scheduledAt:      timestamp("scheduled_at").notNull(),
+    status:           reservationStatusEnum("status").notNull().default("PENDING"),
+    cancelToken:      text("cancel_token").notNull(),
+    reservationToken: text("reservation_token"),
+    createdAt:        timestamp("created_at").notNull().defaultNow(),
+    updatedAt:        timestamp("updated_at").notNull().defaultNow(),
+  });
+
+  export const orders = pgTable("orders", {
+    id:              serial("id").primaryKey(),
+    shopId:          integer("shop_id").notNull(),
+    reservationId:   integer("reservation_id"),
+    stripePaymentId: text("stripe_payment_id"),
+    amount:          integer("amount").notNull(),
+    status:          orderStatusEnum("status").notNull().default("PENDING"),
+    createdAt:       timestamp("created_at").notNull().defaultNow(),
+  });
+
+  // ─────────────────────────────
 // Zodスキーマ（自動生成）
 // ─────────────────────────────
 export const insertAreaSchema         = createInsertSchema(areas).omit({ id: true });

@@ -149,7 +149,25 @@ function CardPaymentForm({
         )}
       </div>
 
-      <div className="flex flex-col gap-2 border-t border-border bg-card px-4 py-4">
+      <div className="flex flex-col gap-4 bg-card px-4 pb-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="notes" className="flex items-center gap-1.5 text-xs font-medium">
+              <MessageSquare className="h-3.5 w-3.5" />
+              備考・ご要望（任意）
+            </Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="アレルギー、ご要望など何でもお書きください"
+              rows={3}
+              className="resize-none text-sm"
+              data-testid="input-notes"
+            />
+          </div>
+        </div>
+
+              <div className="flex flex-col gap-2 border-t border-border bg-card px-4 py-4">
         <Button
           onClick={handlePay}
           disabled={paying || !stripe || !clientSecret || !!piError}
@@ -215,8 +233,7 @@ export function PaymentConfirm({
   const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
   const [formSubmitted, setFormSubmitted] = useState(false);
 
-  // スタッフなし設定の店舗のみ人数セレクタを表示
-  const showPartySize = !staffSelectionEnabled;
+  const showPartySize = true;
   const needsPayment = course.prepaymentOnly && course.price > 0;
 
   // useEffect(() => {
