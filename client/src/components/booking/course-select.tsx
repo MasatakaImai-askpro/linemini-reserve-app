@@ -266,31 +266,24 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
             <div className="bg-muted px-4 py-2.5">
               <h2 className="text-sm font-bold text-foreground">メニュー</h2>
             </div>
-            {menuItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
-                <ImageIcon className="w-8 h-8 opacity-30" />
-                <p className="text-sm">現在メニューはありません</p>
-              </div>
-            ) : (
-              <div className="flex flex-col divide-y divide-border bg-card">
-                {menuItems.map((item) => (
-                  <div key={item.id} className="flex gap-3 px-4 py-3" data-testid={`menu-item-${item.id}`}>
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.name} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
-                    ) : (
-                      <div className="w-16 h-16 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
-                        <ImageIcon className="w-5 h-5 text-muted-foreground" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-foreground" data-testid={`menu-name-${item.id}`}>{item.name}</p>
-                      <p className="text-base font-bold text-primary">¥{item.price.toLocaleString()}</p>
-                      {item.comment && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.comment}</p>}
+            <div className="flex flex-col divide-y divide-border bg-card">
+              {menuItems.map((item) => (
+                <div key={item.id} className="flex gap-3 px-4 py-3" data-testid={`menu-item-${item.id}`}>
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt={item.name} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
+                  ) : (
+                    <div className="w-16 h-16 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
+                      <ImageIcon className="w-5 h-5 text-muted-foreground" />
                     </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground" data-testid={`menu-name-${item.id}`}>{item.name}</p>
+                    <p className="text-base font-bold text-primary">¥{item.price.toLocaleString()}</p>
+                    {item.comment && <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.comment}</p>}
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
