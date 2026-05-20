@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, Clock, User, UserCircle, CreditCard, Loader2, Mail, Phone, FileText } from "lucide-react";
+import { Calendar, Clock, User, UserCircle, CreditCard, Loader2, Mail, Phone, MessageSquare } from "lucide-react";
 import { formatPrice, formatDuration, type Course, type Staff } from "@/lib/booking-api";
 import { format, parseISO } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -24,9 +24,7 @@ interface PaymentConfirmProps {
   time: string;
   maxPartySize?: number;
   staffSelectionEnabled?: boolean;
-  category: string;
-  stripeConnectId?: string;
-  onConfirm: (info: { customerName: string; customerEmail: string; customerPhone: string; partySize?: number; customerNote: string; stripePaymentIntentId?: string }) => void;
+  onConfirm: (info: { customerName: string; customerEmail: string; customerPhone: string; partySize?: number; notes?: string }) => void;
   onBack: () => void;
 }
 
@@ -36,7 +34,6 @@ function CardPaymentForm({
   customerName,
   customerEmail,
   customerPhone,
-  amount,
   onPaid,
   onBack,
   children,
@@ -46,8 +43,7 @@ function CardPaymentForm({
   customerName: string;
   customerEmail: string;
   customerPhone: string;
-  amount: number;
-  onPaid: (paymentIntentId: string) => void;
+  onPaid: () => void;
   onBack: () => void;
   children: React.ReactNode;
 }) {
@@ -65,7 +61,7 @@ function CardPaymentForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         shopId,
-        amount: amount,
+        amount: course.price,
         currency: "jpy",
         courseName: course.name,
         courseId: course.id,
@@ -77,7 +73,7 @@ function CardPaymentForm({
         else setPiError(data.error || "決済の準備に失敗しました");
       })
       .catch(() => setPiError("決済の準備に失敗しました"));
-  }, [shopId, amount, course.name, course.id]);
+  }, [shopId, course.price, course.name, course.id]);
 
   const handlePay = async () => {
     if (!stripe || !elements || !clientSecret) return;
@@ -101,7 +97,7 @@ function CardPaymentForm({
       setCardError(error.message || "決済に失敗しました");
       setPaying(false);
     } else if (paymentIntent?.status === "succeeded") {
-      onPaid(paymentIntent.id);
+      onPaid();
     }
   };
 
@@ -159,7 +155,7 @@ function CardPaymentForm({
           {paying ? (
             <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />決済中...</span>
           ) : (
-            `${formatPrice(amount)} を支払って予約確定`
+            `${formatPrice(course.price)} を支払って予約確定`
           )}
         </Button>
         <Button variant="outline" onClick={onBack} className="w-full py-5 text-sm" data-testid="button-confirm-back">
@@ -170,26 +166,15 @@ function CardPaymentForm({
   );
 }
 
-// let stripePromiseCache: ReturnType<typeof loadStripe> | null = null;
+let stripePromiseCache: ReturnType<typeof loadStripe> | null = null;
 
-// async function getStripePromise() {
-//   if (stripePromiseCache) return stripePromiseCache;
-//   const res = await fetch("/api/stripe/config");
-//   const { publishableKey } = await res.json();
-//   stripePromiseCache = loadStripe(publishableKey);
-//   return stripePromiseCache;
-// }
-
-const stripePromiseCache = new Map<string, ReturnType<typeof loadStripe>>();
-  async function getStripePromise(stripeAccountId?: string) {
-    const cacheKey = stripeAccountId || "__platform__";
-    if (stripePromiseCache.has(cacheKey)) return stripePromiseCache.get(cacheKey)!;
-    const res = await fetch("/api/stripe/config");
-    const { publishableKey } = await res.json();
-    const promise = loadStripe(publishableKey, stripeAccountId ? { stripeAccount: stripeAccountId } : undefined);
-    stripePromiseCache.set(cacheKey, promise);
-    return promise;
-  }
+async function getStripePromise() {
+  if (stripePromiseCache) return stripePromiseCache;
+  const res = await fetch("/api/stripe/config");
+  const { publishableKey } = await res.json();
+  stripePromiseCache = loadStripe(publishableKey);
+  return stripePromiseCache;
+}
 
 export function PaymentConfirm({
   shopId,
@@ -199,13 +184,10 @@ export function PaymentConfirm({
   time,
   maxPartySize = 20,
   staffSelectionEnabled = false,
-  category,
-  stripeConnectId,
   onConfirm,
   onBack,
 }: PaymentConfirmProps) {
-  // const parsedDate = parseISO(date);
-  const parsedDate = date ? parseISO(date) : null;
+  const parsedDate = parseISO(date);
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -215,23 +197,14 @@ export function PaymentConfirm({
   const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
   const [formSubmitted, setFormSubmitted] = useState(false);
 
-  // スタッフなし設定の店舗のみ人数セレクタを表示
-  const showPartySize = !staffSelectionEnabled;
+  const showPartySize = true;
   const needsPayment = course.prepaymentOnly && course.price > 0;
 
-  // useEffect(() => {
-  //   if (needsPayment) {
-  //     getStripePromise().then(setStripePromise);
-  //   }
-  // }, [needsPayment]);
-
   useEffect(() => {
-      if (needsPayment) {
-        const promise = getStripePromise(stripeConnectId);
-        setStripePromise(promise);
-      }
-    }, [needsPayment, stripeConnectId]);
-
+    if (needsPayment) {
+      getStripePromise().then(setStripePromise);
+    }
+  }, [needsPayment]);
 
   const validate = () => {
     const e: typeof errors = {};
@@ -250,7 +223,7 @@ export function PaymentConfirm({
       customerEmail: customerEmail.trim(),
       customerPhone: customerPhone.trim(),
       partySize: showPartySize ? partySize : undefined,
-      customerNote: notes.trim(),
+      notes: notes.trim() || undefined,
     };
     if (!needsPayment) {
       onConfirm(info);
@@ -259,14 +232,6 @@ export function PaymentConfirm({
     }
   };
 
-  // 人数表示対象のカテゴリか
-  const targetCategory = ["gourmet"].includes(category);
-
-  // 人数を表示させるか否か
-  const isPartySizeVisible = showPartySize && targetCategory;
-
-  const totalAmount = course.price * (partySize || 1);
-
   const bookingInfo = (
     <div className="flex flex-col gap-0 divide-y divide-border bg-card">
       <div className="flex items-start gap-3 px-4 py-3">
@@ -274,11 +239,7 @@ export function PaymentConfirm({
         <div>
           <div className="text-xs text-muted-foreground">日時</div>
           <div className="text-sm font-bold text-foreground" data-testid="text-confirm-datetime">
-          {course.enableRequestMode ? (
-            "店舗と相談して決定"
-          ) : (
-            parsedDate ? `${format(parsedDate, "yyyy年M月d日(E)", { locale: ja })} ${time}` : "日時未設定"
-          )}
+            {format(parsedDate, "yyyy年M月d日(E)", { locale: ja })} {time}
           </div>
         </div>
       </div>
@@ -299,7 +260,7 @@ export function PaymentConfirm({
           <div className="mt-0.5 text-xs text-muted-foreground">{formatDuration(course.duration)}</div>
         </div>
       </div>
-      {isPartySizeVisible && (
+      {showPartySize && (
         <div className="flex items-center justify-between px-4 py-3">
           <span className="text-sm text-muted-foreground">人数</span>
           <span className="text-sm font-bold text-foreground" data-testid="text-confirm-party-size">{partySize}名</span>
@@ -307,7 +268,7 @@ export function PaymentConfirm({
       )}
       <div className="flex items-center justify-between px-4 py-3">
         <span className="text-sm font-bold text-foreground">お支払い金額</span>
-        <span className="text-xl font-bold text-primary" data-testid="text-confirm-price">{formatPrice(totalAmount)}</span>
+        <span className="text-xl font-bold text-primary" data-testid="text-confirm-price">{formatPrice(course.price)}</span>
       </div>
       <div className="px-4 py-3">
         <div className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
@@ -339,14 +300,12 @@ export function PaymentConfirm({
             customerName={customerName}
             customerEmail={customerEmail}
             customerPhone={customerPhone}
-            amount={totalAmount}
-            onPaid={(piId) => onConfirm({
+            onPaid={() => onConfirm({
               customerName: customerName.trim(),
               customerEmail: customerEmail.trim(),
               customerPhone: customerPhone.trim(),
               partySize: showPartySize ? partySize : undefined,
-              customerNote: notes.trim(),
-              stripePaymentIntentId: piId,
+              notes: notes.trim() || undefined,
             })}
             onBack={() => setFormSubmitted(false)}
           >
@@ -417,7 +376,7 @@ export function PaymentConfirm({
           {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
         </div>
 
-        {isPartySizeVisible && (
+        {showPartySize && (
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5 text-xs font-medium">
               <User className="h-3.5 w-3.5" />
@@ -426,34 +385,36 @@ export function PaymentConfirm({
             <Select
               value={String(partySize)}
               onValueChange={(v) => setPartySize(Number(v))}
+              disabled={maxPartySize <= 1}
             >
-              <SelectTrigger data-testid="select-party-size">
+              <SelectTrigger data-testid="select-party-size" disabled={maxPartySize <= 1}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Array.from({ length: maxPartySize }, (_, i) => i + 1).map((n) => (
+                {Array.from({ length: Math.max(maxPartySize, 1) }, (_, i) => i + 1).map((n) => (
                   <SelectItem key={n} value={String(n)}>{n}名</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
         )}
+      </div>
+
         <div className="space-y-1.5">
           <Label htmlFor="notes" className="flex items-center gap-1.5 text-xs font-medium">
-            <FileText className="h-3.5 w-3.5" />
-            備考
+            <MessageSquare className="h-3.5 w-3.5" />
+            備考・ご要望（任意）
           </Label>
           <Textarea
             id="notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="アレルギーや、特別なご要望があればご記入ください"
-            className="resize-none text-sm"
+            placeholder="アレルギー、ご要望など何でもお書きください"
             rows={3}
+            className="resize-none text-sm"
             data-testid="input-notes"
           />
         </div>
-      </div>
 
       <div className="flex flex-col gap-2 border-t border-border bg-card px-4 py-4">
         <Button
