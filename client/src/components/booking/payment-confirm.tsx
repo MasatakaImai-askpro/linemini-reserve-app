@@ -216,7 +216,7 @@ export function PaymentConfirm({
   const [formSubmitted, setFormSubmitted] = useState(false);
 
   // スタッフなし設定の店舗のみ人数セレクタを表示
-  const showPartySize = !staffSelectionEnabled;
+  const showPartySize = true;
   const needsPayment = course.prepaymentOnly && course.price > 0;
 
   // useEffect(() => {

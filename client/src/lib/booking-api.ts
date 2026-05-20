@@ -133,7 +133,7 @@ export const deleteCourse = (shopId: number, id: string) =>
 export const createReservation = (shopId: number, data: Partial<Reservation>) =>
   api(`/api/shops/${shopId}/reservations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
 
-export const updateReservation = (shopId: number, data: { id: string; status?: string; paid?: boolean; customerName?: string; customerPhone?: string; customerEmail?: string; date?: string; time?: string; staffId?: string; courseId?: string }) =>
+export const updateReservation = (shopId: number, data: { id: string; status?: string; paid?: boolean; customerName?: string; customerPhone?: string; customerEmail?: string; date?: string; time?: string; staffId?: string; courseId?: string; partySize?: number; notes?: string }) =>
   api(`/api/shops/${shopId}/reservations`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
 
 export const fetchSlots = (shopId: number, staffId: string, date?: string, courseId?: string) => {

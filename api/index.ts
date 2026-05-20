@@ -189,6 +189,8 @@ function toReservation(r: any) {
     customerEmail: r.customer_email || undefined,
     customerNote: r.customer_note || undefined,
     customerCount: r.customer_count || undefined,
+    partySize: r.party_size ?? 1,
+    notes: r.notes || undefined,
     date: r.date,
     time: r.time,
     staffId: r.staff_id || "__shop__",
@@ -1229,9 +1231,14 @@ export function ensureSetup(): Promise<void> {
             unvaiavleTimes = new Set(unvaliavle.map((u: any) => u.time));
           }
 
-          const result = allSlots.map(slot => { 
+          const nowJst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+            const todayStr = `${nowJst.getFullYear()}-${String(nowJst.getMonth()+1).padStart(2,"0")}-${String(nowJst.getDate()).padStart(2,"0")}`;
+            const isToday = date === todayStr;
+            const nowMinutes = isToday ? nowJst.getHours()*60 + nowJst.getMinutes() + 15 : 0;
+                      const result = allSlots.map(slot => { 
             const [sh,sm]=slot.split(":").map(Number);
             const sStart=sh*60+sm;
+            if (isToday && sStart <= nowMinutes) return {time:slot,available:false};
             if (sStart+courseDuration>closeHour*60) return {time:slot,available:false};
             if (unvaiavleTimes.has(slot)) return {time:slot,available:false};
             let max=0;
