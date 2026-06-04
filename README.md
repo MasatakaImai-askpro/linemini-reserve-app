@@ -1,4 +1,4 @@
-# かながわ西部おでかけナビ
+# かながわスマイルマップ
 
   Regional portal LINE Mini App for western Kanagawa prefecture (大和・小田原周辺).
 

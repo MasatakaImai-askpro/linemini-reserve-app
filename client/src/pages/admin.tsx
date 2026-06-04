@@ -87,19 +87,10 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
 
   const updateShopMutation = useMutation({
     mutationFn: async () => {
-      const settings = await apiRequest("GET", `/api/shops/${shop.id}/settings`);
-      const settingsData = await settings.json();
-      if (reservationEnabled) {
-        if (!settingsData.table_count || !settingsData.max_party_size) {
-          throw new Error("TABLE_NOT_CONFIGURED");
-        } else if (!settingsData.store_email) {
-          throw new Error("EMAIL_NOT_CONFIGURED");
-        }
-      }
       await apiRequest("PUT", `/api/shops/${shop.id}`, {
         displayOrder: parseInt(displayOrder) || 0,
         lineAccountUrl: lineAccountUrl || null,
-        reservationUrl: reservationEnabled ? `/reservation/${shop.id}` : null,
+        reservationUrl: reservationEnabled ? `/app/reservation/${shop.id}` : null,
         subcategory: subcategory || null,
       });
     },
@@ -107,24 +98,8 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
       queryClient.invalidateQueries({ queryKey: ["/api/shops"] });
       toast({ title: "店舗情報を更新しました" });
     },
-    onError: (err: any) => {
-      if (err.message === "TABLE_NOT_CONFIGURED") {
-        setReservationEnabled(false);
-        toast({ 
-          title: "予約機能を有効にできません（予約設定未）", 
-          description: "予約設定タブより上限卓数と上限人数を設定後、再度お試しください。",
-          variant: "destructive" 
-        });
-      } else if (err.message === "EMAIL_NOT_CONFIGURED") {
-        setReservationEnabled(false);
-        toast({ 
-          title: "予約機能を有効にできません（メールアドレス未登録）", 
-          description: "店舗管理タブより店舗のメールアドレスを登録後、再度お試しください。",
-          variant: "destructive" 
-        });
-      } else {
-        toast({ title: "更新に失敗しました", variant: "destructive" });
-      }
+    onError: () => {
+      toast({ title: "更新に失敗しました", variant: "destructive" });
     },
   });
 
@@ -175,8 +150,6 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
       toast({ title: "クーポンの削除に失敗しました", variant: "destructive" });
     },
   });
-
-  const isLineCouponWithoutUrl = newCouponIsLine && !shop.lineAccountUrl;
 
   return (
     <Card className="overflow-visible p-5 space-y-5">
@@ -240,7 +213,7 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
       {reservationEnabled && (
         <div className="rounded-md border bg-muted/30 p-3 space-y-1.5" data-testid={`text-reservation-url-${shop.id}`}>
           <p className="text-xs font-semibold text-muted-foreground mb-2">予約ページURL</p>
-          <CopyableUrl label="WEB版" path={`/web/reservation/${shop.id}`} />
+          <CopyableUrl label="WEB版" path={`/reservation/${shop.id}`} />
           <CopyableUrl label="LINEミニアプリ版" path={`/app/reservation/${shop.id}`} />
         </div>
       )}
@@ -255,26 +228,12 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
           {updateShopMutation.isPending ? "保存中..." : "店舗設定を保存"}
         </Button>
 
-        {/* <Link href={`/admin/shop/${shop.id}`} target="_blank" rel="noopener noreferrer">
+        <Link href={`/admin/shop/${shop.id}`}>
           <Button variant="outline" size="sm" className="gap-1.5" data-testid={`button-shop-manage-${shop.id}`}>
             <ExternalLink className="w-3.5 h-3.5" />
             店舗管理画面を開く
           </Button>
-        </Link> */}
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="gap-1.5" 
-          data-testid={`button-shop-manage-${shop.id}`}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            window.open(`/admin/shop/${shop.id}`, '_blank', 'noopener,noreferrer');
-          }}
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-          店舗管理画面を開く
-        </Button>
+        </Link>
       </div>
 
       <div className="border-t pt-4">
@@ -288,23 +247,29 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
         ) : (
           <div className="space-y-2 mb-4">
             {shopCoupons.map((coupon) => (
-              <div key={coupon.id} className="flex items-center justify-between p-3 rounded-md border bg-card" data-testid={`admin-coupon-${coupon.id}`}>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{coupon.title}</span>
-                    {coupon.isLineAccountCoupon && (
-                      <Badge className="bg-[#06C755] border-[#06C755] text-white text-xs">
-                        <SiLine className="w-3 h-3 mr-0.5" />
-                        LINE限定
-                      </Badge>
-                    )}
-                    {coupon.discount && (
-                      <Badge variant="secondary" className="text-xs">{coupon.discount}</Badge>
+              <div key={coupon.id} className={`flex items-center justify-between p-3 rounded-md border bg-card border-l-4 ${coupon.isLineAccountCoupon ? "border-l-[#06C755]" : "border-l-orange-400"}`} data-testid={`admin-coupon-${coupon.id}`}>
+                <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${coupon.isLineAccountCoupon ? "bg-[#06C755]" : "bg-orange-400"}`}>
+                    {coupon.isLineAccountCoupon
+                      ? <SiLine className="w-4 h-4 text-white" />
+                      : <Ticket className="w-4 h-4 text-white" />
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium">{coupon.title}</span>
+                      {coupon.isLineAccountCoupon
+                        ? <Badge className="bg-[#06C755] border-[#06C755] text-white text-xs">LINE限定</Badge>
+                        : <Badge className="bg-orange-100 border-orange-300 text-orange-700 text-xs">通常クーポン</Badge>
+                      }
+                      {coupon.discount && (
+                        <Badge variant="secondary" className="text-xs">{coupon.discount}</Badge>
+                      )}
+                    </div>
+                    {coupon.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{coupon.description}</p>
                     )}
                   </div>
-                  {coupon.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5">{coupon.description}</p>
-                  )}
                 </div>
                 <Button
                   size="icon"
@@ -329,7 +294,6 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
             <Plus className="w-3 h-3" />
             新しいクーポンを追加
           </h5>
-          <label className="text-[10px] text-muted-foreground mb-0.5 block">※LINE公式アカウント限定クーポンはLINE公式アカウントURLがない場合、追加できません。</label>
           <div className="space-y-2">
             <Input
               placeholder="クーポンタイトル"
@@ -387,7 +351,7 @@ function ShopEditor({ shop, onClose }: { shop: Shop; onClose: () => void }) {
               <Button
                 size="sm"
                 onClick={() => createCouponMutation.mutate()}
-                disabled={!newCouponTitle || isLineCouponWithoutUrl ||createCouponMutation.isPending}
+                disabled={!newCouponTitle || createCouponMutation.isPending}
                 data-testid={`button-add-coupon-${shop.id}`}
               >
                 <Plus className="w-4 h-4 mr-1" />
@@ -467,7 +431,7 @@ function AddShopDialog({ open, onClose }: { open: boolean; onClose: () => void }
                 </SelectTrigger>
                 <SelectContent>
                   {AREAS.map((a) => (
-                    <SelectItem key={a.slug} value={a.slug}>{a.name}</SelectItem>
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -480,7 +444,7 @@ function AddShopDialog({ open, onClose }: { open: boolean; onClose: () => void }
                 </SelectTrigger>
                 <SelectContent>
                   {CATEGORIES.map((c) => (
-                    <SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "wouter";
 import { useBasePath } from "@/hooks/use-base-path";
+import { useSEO, useJsonLd, buildLocalBusinessLd } from "@/lib/seo";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,11 +26,9 @@ import {
   CalendarX2,
   CheckCircle,
   ThumbsUp,
-  MessageCircle
 } from "lucide-react";
 import { SiLine } from "react-icons/si";
 import type { Shop, Coupon } from "@shared/schema";
-import { type Course } from "@/lib/booking-api";
 import { getAreaName, getCategoryName, isRecentlyUpdated } from "@/lib/data";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useCoupons } from "@/hooks/use-coupons";
@@ -195,21 +194,36 @@ export default function DetailPage() {
     enabled: !!params.id,
   });
 
-  const { data: courses = [] } = useQuery<Course[]>({
-    queryKey: ["/api/shops", params.id, "courses"],
-    queryFn: async () => {
-      const res = await fetch(`/api/shops/${params.id}/courses`);
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: !!params.id,
-  });
-
-
-
   const { isFavorite, toggleFavorite } = useFavorites();
   const { acquireCoupon, isAcquired } = useCoupons();
-  const { liked, count, like } = useLikes(shop?.id || 0, shop?.likeCount || 0);
+  const { liked, count, like } = useLikes(shop?.id || 0);
+
+  useSEO(shop ? {
+    title: `${shop.name} | ${getCategoryName(shop.category)} ${getAreaName(shop.area)} 予約・クーポン`,
+    description: `${shop.name}（${getAreaName(shop.area)}）の予約・クーポン情報。${shop.description} ${shop.address}`,
+    keywords: `${shop.name},${getAreaName(shop.area)},${getCategoryName(shop.category)},予約,クーポン,神奈川`,
+    canonical: `/app/shop/${params.id}`,
+    ogImage: shop.imageUrl,
+    ogType: "business.business",
+  } : { noindex: true });
+
+  useJsonLd(
+    `shop-${params.id}-jsonld`,
+    shop ? buildLocalBusinessLd({
+      id: shop.id,
+      name: shop.name,
+      description: shop.description,
+      address: shop.address,
+      phone: shop.phone,
+      website: shop.website,
+      hours: shop.hours,
+      category: shop.category,
+      area: getAreaName(shop.area),
+      imageUrl: shop.imageUrl,
+      latitude: shop.latitude,
+      longitude: shop.longitude,
+    }) : null
+  );
 
   if (isLoading) {
     return (
@@ -247,9 +261,8 @@ export default function DetailPage() {
 
   const galleryImages = shop.galleryImageUrls?.filter(Boolean) || [];
   const sliderImages = galleryImages.length > 0 ? galleryImages : [shop.imageUrl];
-  const prefix = basePath.split("/").find(seg =>["app","web","web-sp"].includes(seg)) ?? "app" ;
   const reservationPath = shop.reservationUrl
-    ? `${basePath}${shop.reservationUrl}`
+    ? shop.reservationUrl.replace(/^\/(app|web|web-sp)\//, `${basePath}/`)
     : null;
 
   return (
@@ -288,14 +301,14 @@ export default function DetailPage() {
 
         <div className={`py-6 space-y-6 ${isWeb ? "px-6 lg:px-8" : "px-4 md:px-6"}`}>
           {regularCoupons.length > 0 && (
-            <Card className="overflow-visible border-2 border-[#06C755]/30 bg-gradient-to-br from-[#06C755]/5 to-card">
+            <Card className="overflow-visible border-2 border-orange-400/40 bg-gradient-to-br from-orange-50/60 to-card">
               <div className="p-5">
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-[#06C755] flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-orange-400 flex items-center justify-center">
                     <Ticket className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <p className="text-xs text-[#06C755] font-semibold">クーポン</p>
+                    <p className="text-xs text-orange-500 font-semibold">クーポン</p>
                     <h3 className="font-bold text-base" data-testid="text-coupon-section-title">
                       {regularCoupons.length}件のクーポン
                     </h3>
@@ -320,24 +333,42 @@ export default function DetailPage() {
           {lineCoupons.length > 0 && (
             <Card className="overflow-visible border-2 border-[#06C755]/50 bg-gradient-to-br from-[#06C755]/10 to-card">
               <div className="p-5">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-3">
                   <div className="w-10 h-10 rounded-full bg-[#06C755] flex items-center justify-center">
                     <SiLine className="w-5 h-5 text-white" />
                   </div>
                   <div>
                     <p className="text-xs text-[#06C755] font-semibold">LINE公式アカウント限定</p>
                     <h3 className="font-bold text-base" data-testid="text-line-coupon-section-title">
-                      LINE友だち追加限定クーポン
+                      {shop.name} LINE友だち追加限定クーポン
                     </h3>
                   </div>
                 </div>
+
+                {shop.lineAccountUrl && (
+                  <Button
+                    className="w-full bg-[#06C755] hover:bg-[#05a847] border-[#06C755] text-white font-bold text-sm mb-3"
+                    asChild
+                  >
+                    <a
+                      href={shop.lineAccountUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid="link-shop-line-account"
+                      className="flex items-center justify-center gap-2 whitespace-nowrap overflow-hidden"
+                    >
+                      <SiLine className="w-5 h-5 flex-shrink-0" />
+                      <span className="truncate">LINE友だち追加はこちら</span>
+                    </a>
+                  </Button>
+                )}
 
                 <div className="rounded-md bg-[#06C755]/10 border border-[#06C755]/20 px-3 py-2 mb-4 text-xs text-[#065f36] flex items-start gap-1.5">
                   <SiLine className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                   <span>このクーポンはLINE公式アカウントを友だち追加した方のみご利用いただけます</span>
                 </div>
 
-                <div className="space-y-3 mb-4">
+                <div className="space-y-3">
                   {lineCoupons.map((coupon) => (
                     <CouponCard
                       key={coupon.id}
@@ -349,24 +380,6 @@ export default function DetailPage() {
                     />
                   ))}
                 </div>
-
-                {shop.lineAccountUrl && (
-                  <Button
-                    className="w-full bg-[#06C755] border-[#06C755] text-white font-bold text-xs"
-                    asChild
-                  >
-                    <a
-                      href={shop.lineAccountUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      data-testid="link-shop-line-account"
-                      className="flex items-center justify-center gap-1.5 whitespace-nowrap overflow-hidden"
-                    >
-                      <SiLine className="w-5 h-5 flex-shrink-0" />
-                      <span className="truncate">公式LINEアカウント追加はこちら</span>
-                    </a>
-                  </Button>
-                )}
               </div>
             </Card>
           )}
@@ -381,19 +394,15 @@ export default function DetailPage() {
           </Card>
 
           {reservationPath && (
-            <div className="flex flex-col gap-3">
-              {/* 「予約する」ボタン */}
-              <Button
-                className="w-full bg-primary text-primary-foreground font-bold py-6 text-base"
-                asChild
-              >
-                <Link href={reservationPath} data-testid="link-reservation-mid">
-                  <CalendarCheck className="w-5 h-5 mr-2" />
-                  予約する
-                </Link>
-              </Button>
-
-            </div>
+            <Button
+              className="w-full bg-primary text-primary-foreground font-bold py-6 text-base"
+              asChild
+            >
+              <Link href={reservationPath} data-testid="link-reservation-mid">
+                <CalendarCheck className="w-5 h-5 mr-2" />
+                予約する
+              </Link>
+            </Button>
           )}
 
           <Card className="overflow-visible p-5">
@@ -479,6 +488,12 @@ export default function DetailPage() {
               <ArrowLeft className="w-4 h-4 mr-1" />
               戻る
             </Button>
+            <Button variant="outline" asChild>
+              <Link href={basePath} data-testid="link-top-bottom">
+                トップページ
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Link>
+            </Button>
           </div>
         </div>
       </div>
@@ -488,11 +503,11 @@ export default function DetailPage() {
           <div className="max-w-3xl mx-auto text-center">
             <Link href={basePath}>
               <span className="text-sm font-bold text-primary cursor-pointer" data-testid="link-footer-detail-home">
-                神奈川おでかけナビ
+                かながわスマイルマップ
               </span>
             </Link>
             <p className="text-xs text-muted-foreground mt-2">
-              &copy; 2026 神奈川おでかけナビ All Rights Reserved.
+              &copy; 2026 かながわスマイルマップ All Rights Reserved.
             </p>
           </div>
         </footer>

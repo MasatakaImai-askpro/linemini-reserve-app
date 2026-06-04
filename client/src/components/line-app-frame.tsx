@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from "react";
 import { useLocation } from "wouter";
-import { X, Home, ChevronLeft, Ticket, CalendarX2, Star, Store } from "lucide-react";
+import { X, Home, ChevronLeft, BadgePercent, CalendarX2, Star, Store } from "lucide-react";
 import { SiLine } from "react-icons/si";
 import { useCoupons, type AcquiredCoupon } from "@/hooks/use-coupons";
 
@@ -50,7 +50,7 @@ function CouponWalletModal({ onClose }: { onClose: () => void }) {
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <div className="flex items-center gap-2">
-            <Ticket className="w-4 h-4 text-primary" />
+            <BadgePercent className="w-4 h-4 text-primary" />
             <h2 className="font-bold text-sm">取得済みクーポン</h2>
             {valid.length > 0 && (
               <span className="bg-primary text-primary-foreground text-xs font-bold rounded-full px-1.5 py-0.5">
@@ -70,7 +70,7 @@ function CouponWalletModal({ onClose }: { onClose: () => void }) {
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {acquired.length === 0 ? (
             <div className="text-center py-10">
-              <Ticket className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+              <BadgePercent className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-sm text-muted-foreground">まだクーポンを取得していません</p>
               <p className="text-xs text-muted-foreground mt-1">店舗ページでクーポンを取得してください</p>
             </div>
@@ -154,11 +154,11 @@ function LineHeader() {
 
   const isHome = location === "/app";
   const getTitle = () => {
-    if (isHome) return "神奈川おでかけナビ";
+    if (isHome) return "かながわスマイルマップ";
     if (location.startsWith("/app/list")) return "お店一覧";
     if (location.startsWith("/app/shop/")) return "お店詳細";
     if (location.startsWith("/app/reservation/")) return "予約";
-    return "神奈川おでかけナビ";
+    return "かながわスマイルマップ";
   };
 
   return (
@@ -188,7 +188,7 @@ function LineHeader() {
             className="p-1 rounded-full hover:bg-gray-100 transition-colors relative"
             data-testid="button-coupon-wallet"
           >
-            <Ticket className="w-3.5 h-3.5 text-gray-500" />
+            <BadgePercent className="w-3.5 h-3.5 text-gray-500" />
             {validCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-primary rounded-full text-[8px] font-bold text-primary-foreground flex items-center justify-center">
                 {validCount > 9 ? "9+" : validCount}
@@ -204,6 +204,13 @@ function LineHeader() {
               <Home className="w-3.5 h-3.5 text-gray-500" />
             </button>
           )}
+          <button
+            onClick={() => navigate("/line")}
+            className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+            data-testid="button-line-close"
+          >
+            <X className="w-3.5 h-3.5 text-gray-500" />
+          </button>
         </div>
       </div>
       {walletOpen && <CouponWalletModal onClose={() => setWalletOpen(false)} />}
@@ -222,15 +229,13 @@ function LineBottomBar() {
 }
 
 export default function LineAppFrame({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
-  const isHome = location === "/app";
   return (
-    <div className="h-dvh bg-gray-800 flex items-start justify-center md:py-8 md:px-4 overflow-hidden" data-testid="line-app-frame">
+    <div className="h-dvh bg-white flex items-start justify-center md:py-8 md:px-4 overflow-hidden" data-testid="line-app-frame">
       <div className="w-full md:max-w-[375px] md:rounded-[2.5rem] md:overflow-hidden md:shadow-2xl md:border-4 md:border-gray-700 relative bg-background h-full md:h-[min(812px,calc(100dvh-4rem))] flex flex-col">
         <div className="hidden md:block">
           <LineStatusBar />
         </div>
-        {!isHome && <LineHeader />}
+        <LineHeader />
         <div className="flex-1 overflow-y-auto overflow-x-hidden" data-testid="line-app-content">
           {children}
         </div>

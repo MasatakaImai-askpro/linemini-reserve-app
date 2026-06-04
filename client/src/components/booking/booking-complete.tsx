@@ -12,19 +12,13 @@ interface BookingCompleteProps {
   time: string;
   reservationId: string | null;
   reservationToken: string | null;
-  partySize: number;
   onClose: () => void;
 }
 
-export function BookingComplete({ shopId, course, partySize, staff, date, time, reservationToken, onClose}: BookingCompleteProps) {
-
-  const totalAmount = course.price * partySize;
-  const parsedDate = date ? parseISO(date) : null;
-  const isRequest = course.enableRequestMode;
-  const isWeb = window.location.pathname.startsWith('/web');
-  const pathPrefix = isWeb ? "web" : "app"
+export function BookingComplete({ shopId, course, staff, date, time, reservationToken, onClose }: BookingCompleteProps) {
+  const parsedDate = parseISO(date);
   const cancelUrl = reservationToken
-    ? `${window.location.origin}/${pathPrefix}/cancel/${shopId}/${reservationToken}`
+    ? `${window.location.origin}/app/cancel/${shopId}/${reservationToken}`
     : null;
 
   return (
@@ -33,11 +27,9 @@ export function BookingComplete({ shopId, course, partySize, staff, date, time, 
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#06C755]">
           <Check className="h-8 w-8 text-white" strokeWidth={3} />
         </div>
-        <h2 className="mt-4 text-lg font-bold text-foreground" data-testid="text-booking-complete">
-          {isRequest ? "予約リクエストを送信しました" : "予約が完了しました"}
-        </h2>
+        <h2 className="mt-4 text-lg font-bold text-foreground" data-testid="text-booking-complete">予約が完了しました</h2>
         <p className="mt-1 text-center text-xs text-muted-foreground">
-          {isRequest ? "店舗よりご連絡させていただきます" : "ご予約ありがとうございます。"}
+          ご予約ありがとうございます。
         </p>
       </div>
 
@@ -51,15 +43,11 @@ export function BookingComplete({ shopId, course, partySize, staff, date, time, 
             <div>
               <div className="text-xs text-muted-foreground">日時</div>
               <div className="text-sm font-bold text-foreground">
-                {isRequest || !parsedDate ? (
-                  "日時指定なし"
-                ) : (
-                  `${format(parsedDate, "yyyy年M月d日(E)", { locale: ja })} ${time}`
-                )}
+                {format(parsedDate, "yyyy年M月d日(E)", { locale: ja })} {time}
               </div>
             </div>
           </div>
-          {!isRequest && staff && (
+          {staff && (
             <div className="flex items-start gap-3 px-4 py-3">
               <User className="mt-0.5 h-4 w-4 shrink-0 text-[#06C755]" />
               <div>
@@ -79,18 +67,11 @@ export function BookingComplete({ shopId, course, partySize, staff, date, time, 
             </div>
           </div>
           <div className="flex items-start gap-3 px-4 py-3">
-            <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#06C755]" />
-            <div>
-              <div className="text-xs text-muted-foreground">人数</div>
-              <div className="text-sm font-bold text-foreground">{partySize}</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-3 px-4 py-3">
             <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-[#06C755]" />
             <div>
               <div className="text-xs text-muted-foreground">お支払い</div>
               <div className="text-sm font-bold text-foreground">
-                {formatPrice(totalAmount)}
+                {formatPrice(course.price)}
                 <span className="ml-2 text-xs font-normal text-muted-foreground">
                   {course.prepaymentOnly ? "(事前決済)" : "(当日払い)"}
                 </span>

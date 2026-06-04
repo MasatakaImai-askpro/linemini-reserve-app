@@ -1,4 +1,4 @@
-import { Clock, CreditCard, Info } from "lucide-react";
+import { Clock, CreditCard } from "lucide-react";
 import { formatPrice, formatDuration, type Course } from "@/lib/booking-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,17 +12,16 @@ interface CourseDetailProps {
 export function CourseDetail({ course, onBook }: CourseDetailProps) {
   return (
     <div className="flex flex-col" data-testid="booking-course-detail">
-    {course.imageUrl && (
-      <div 
-        className="relative h-48 bg-cover bg-center rounded-t-lg border-b border-border bg-muted w-full" 
-        style={{ backgroundImage: `url(${course.imageUrl})` }}
-      >
+      <div className="relative h-48 bg-gradient-to-br from-amber-50 to-orange-100">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-4xl font-bold text-amber-900/20">{course.category}</div>
+        </div>
       </div>
-    )}
 
       <div className="flex flex-col gap-4 px-4 py-5">
         <div>
           <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-[10px]">{course.category}</Badge>
             {course.prepaymentOnly && (
               <Badge variant="secondary" className="gap-1 bg-primary/10 text-primary text-[10px] px-1.5 py-0">
                 <CreditCard className="h-2.5 w-2.5" />
@@ -50,24 +49,12 @@ export function CourseDetail({ course, onBook }: CourseDetailProps) {
           </p>
         </div>
 
-        {course.enableRequestMode && (
-          <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
-            <Info className="h-5 w-5 shrink-0 text-amber-600" />
-            <div className="text-xs leading-relaxed">
-              <p className="font-bold mb-0.5">日時指定なしの予約となります</p>
-              <p>
-                リクエスト送信後、店舗よりご連絡いたしますので日程調整を行ってください。
-              </p>
-            </div>
-          </div>
-        )}
-
         <Button
           onClick={onBook}
           className="mt-2 w-full rounded-xl py-6 text-base font-bold"
           data-testid="button-book-course"
         >
-          {course.enableRequestMode ? "予約リクエストを送信する" : "このコースを予約する"}
+          このコースを予約する
         </Button>
       </div>
     </div>

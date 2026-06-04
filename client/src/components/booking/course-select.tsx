@@ -14,23 +14,26 @@ interface CourseSelectProps {
 }
 
 type MenuItem = {
-    id: number;
-    name: string;
-    price: number;
-    comment: string;
-    imageUrl: string | null;
-    isVisible: boolean;
-    displayOrder: number;
-  };
+  id: number;
+  name: string;
+  price: number;
+  comment: string;
+  imageUrl: string | null;
+  isVisible: boolean;
+  displayOrder: number;
+};
 
-  type Tab = "courses" | "menu" | "store-info";
+type Tab = "courses" | "menu" | "store-info";
 
-export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onSelect}: CourseSelectProps) {
+export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onSelect }: CourseSelectProps) {
   const stripeActive = !!(stripeConnectId && stripeConnectStatus === "active");
   const [activeTab, setActiveTab] = useState<Tab>("courses");
   const [courses, setCourses] = useState<Course[]>([]);
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [storeName, setStoreName] = useState("Beaute Salon");
+  const [storeDescription, setStoreDescription] = useState("あなたの美しさを引き出す");
+
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
   const [showForm, setShowForm] = useState(false);
@@ -42,26 +45,20 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
-      setLoading(true);
-      Promise.all([
-        fetchCourses(shopId),
-        fetchSettings(shopId),
-        fetch(`/api/shops/${shopId}/menu-items`)
-        .then((r) => (r.ok ? r.json() : []))
-        .then((data) => {
-          return data.map((item: any) => ({
-            ...item,
-            isVisible: item.is_visible,
-            imageUrl: item.image_url
-          }));
-        }),
-      ]).then(([c, s, m]) => {
-        setCourses(c);
-        setSettings(s);
-        setMenuItems(m || []);
-        setLoading(false);
-      });
-    }, [shopId]);
+    setLoading(true);
+    Promise.all([
+      fetchCourses(shopId),
+      fetchSettings(shopId),
+      fetch(`/api/shops/${shopId}/menu-items`).then((r) => r.ok ? r.json() : []),
+    ]).then(([c, s, m]) => {
+      setCourses(c);
+      setSettings(s);
+      setMenuItems(m || []);
+      if (s.store_name) setStoreName(s.store_name);
+      if (s.store_description) setStoreDescription(s.store_description);
+      setLoading(false);
+    });
+  }, [shopId]);
 
   const handleSubmit = async () => {
     if (!formName || !formMessage) return;
@@ -84,8 +81,17 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
     );
   }
 
+  const categories = [...new Set(courses.map((c) => c.category))];
+
   return (
     <div className="flex flex-col" data-testid="booking-course-select">
+      <div className="relative h-36 bg-gradient-to-br from-amber-50 to-orange-100">
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div className="mb-1 text-xs tracking-widest text-amber-700">ESTHETIC SALON</div>
+          <h1 className="text-xl font-bold text-amber-900">{storeName}</h1>
+          <p className="mt-1 text-xs text-amber-700">{storeDescription}</p>
+        </div>
+      </div>
 
       <div className="flex border-b border-border bg-card">
         <button
@@ -100,19 +106,19 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
           コース一覧
         </button>
         {menuItems.length > 0 && (
-            <button
-              onClick={() => setActiveTab("menu")}
-              className={`flex-1 px-4 py-3 text-center text-sm font-bold ${
-                activeTab === "menu"
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-muted-foreground"
-              }`}
-              data-testid="tab-menu"
-            >
-              メニュー
-            </button>
-          )}
           <button
+            onClick={() => setActiveTab("menu")}
+            className={`flex-1 px-4 py-3 text-center text-sm font-bold ${
+              activeTab === "menu"
+                ? "border-b-2 border-primary text-primary"
+                : "text-muted-foreground"
+            }`}
+            data-testid="tab-menu"
+          >
+            メニュー
+          </button>
+        )}
+        <button
           onClick={() => setActiveTab("store-info")}
           className={`flex-1 px-4 py-3 text-center text-sm font-bold ${
             activeTab === "store-info"
@@ -125,7 +131,7 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
         </button>
       </div>
 
-      {/* {activeTab === "courses" && (
+      {activeTab === "courses" && (
         <>
           {!stripeActive && courses.some((c) => c.prepaymentOnly) && (
             <div className="mx-4 mt-3 mb-1 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
@@ -193,84 +199,18 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
             </div>
           ))}
         </>
-      )} */}
-
-      {activeTab === "courses" && (
-        <>
-          {/* Stripe未設定時の警告ボックス（ロジックは維持） */}
-          {!stripeActive && courses.some((c) => c.prepaymentOnly) && (
-            <div className="mx-4 mt-3 mb-1 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-              <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-              <p className="text-xs text-amber-800 leading-relaxed">
-                「事前決済」マークのコースはオンライン決済の設定が完了していないため、現在ご予約いただけません。
-              </p>
-            </div>
-          )}
-
-          {/* コースを直接ループして表示 */}
-          <div className="flex flex-col divide-y divide-border">
-            {courses.map((course) => {
-              const disabled = course.prepaymentOnly && !stripeActive;
-              return (
-                <button
-                  key={course.id}
-                  onClick={() => !disabled && onSelect(course)}
-                  disabled={disabled}
-                  className={`flex items-start gap-3 px-4 py-4 text-left transition-colors ${
-                    disabled
-                      ? "bg-muted/30 opacity-50 cursor-not-allowed"
-                      : "bg-card hover:bg-muted/50 active:bg-muted"
-                  }`}
-                  data-testid={`course-item-${course.id}`}
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-foreground">{course.name}</h3>
-                      {course.prepaymentOnly && (
-                        <Badge
-                          variant="secondary"
-                          className={`gap-1 text-[10px] px-1.5 py-0 ${
-                            stripeActive
-                              ? "bg-primary/10 text-primary"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          <CreditCard className="h-2.5 w-2.5" />
-                          事前決済
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-2">
-                      {course.description}
-                    </p>
-                    <div className="mt-2 flex items-center gap-3">
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        {formatDuration(course.duration)}
-                      </span>
-                      <span className="text-base font-bold text-primary">
-                        {formatPrice(course.price)}
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-muted-foreground" />
-                </button>
-              );
-            })}
-          </div>
-        </>
       )}
 
       {activeTab === "menu" && (
-          <div className="flex flex-col" data-testid="booking-menu-tab">
-            <div className="bg-muted px-4 py-2.5">
-              <h2 className="text-sm font-bold text-foreground">メニュー</h2>
-            </div>
-            <div className="flex flex-col divide-y divide-border bg-card">
-              {menuItems.map((item) => (
+        <div className="flex flex-col divide-y divide-border bg-card" data-testid="booking-menu-tab">
+          {menuItems.map((item) => (
                 <div key={item.id} className="flex gap-3 px-4 py-3" data-testid={`menu-item-${item.id}`}>
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.name} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-16 h-16 object-cover rounded-md flex-shrink-0"
+                    />
                   ) : (
                     <div className="w-16 h-16 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
                       <ImageIcon className="w-5 h-5 text-muted-foreground" />
@@ -279,15 +219,16 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground" data-testid={`menu-name-${item.id}`}>{item.name}</p>
                     <p className="text-base font-bold text-primary">¥{item.price.toLocaleString()}</p>
-                    {item.comment && <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.comment}</p>}
+                    {item.comment && (
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.comment}</p>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+          ))}
+        </div>
+      )}
 
-              {activeTab === "store-info" && settings && (
+      {activeTab === "store-info" && settings && (
         <>
           {sent ? (
             <div className="flex flex-col items-center justify-center gap-4 px-6 py-16">
@@ -350,7 +291,7 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
                 </div>
               </div>
 
-              {/* <div className="bg-muted px-4 py-2.5">
+              <div className="bg-muted px-4 py-2.5">
                 <h2 className="text-sm font-bold text-foreground">お問い合わせ</h2>
               </div>
 
@@ -393,7 +334,7 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
                     送信する
                   </Button>
                 </div>
-              )} */}
+              )}
             </>
           )}
         </>

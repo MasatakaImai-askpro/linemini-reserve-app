@@ -1,4 +1,4 @@
-# かながわ西部おでかけナビ
+# かながわスマイルマップ
 
 ## Overview
 A regional portal site for western Kanagawa prefecture (大和、小田原周辺) targeting local shops from shopping streets and associations. Built as a **LINE Mini App** with per-shop coupon management, Google Maps embed, full booking/reservation system, and admin dashboard. The UI renders inside a LINE-style phone frame with LINE header navigation.
@@ -19,7 +19,7 @@ A regional portal site for western Kanagawa prefecture (大和、小田原周辺
 - **Reservation Page** (`/app/reservation/:id`) - Per-shop multi-step booking wizard: course select → course detail → date/time → confirm (name/email/phone入力) → complete (キャンセルリンク表示)
 - **Cancel Page** (`/app/cancel/:shopId/:token`) - Token-based reservation cancel page (メール送付用、localStorageに依存しない)
 - **Admin Dashboard** (`/admin`) - 管理者用。店舗一覧、表示順序、予約ON/OFF、LINE設定、クーポン管理。予約有効な店舗には「店舗管理画面を開く」リンク付き
-- **Shop Admin Page** (`/admin/shop/:id`) - 各店舗の管理画面。4タブ: コース管理, スタッフ管理, 予約枠管理, 予約一覧。店舗オーナー向け
+- **Shop Admin Page** (`/admin/shop/:id`) - 各店舗の管理画面。8タブ: 画像管理, メニュー管理, コース管理, スタッフ管理, 予約枠管理, 予約一覧, 予約設定, 決済設定。店舗オーナー向け
 
 ## ルート統合（URL統一）
 - **ミニアプリとWEB版は `/app/*` に統一**。`/web/*` は後方互換リダイレクト（→`/app/*`）のみ
@@ -43,14 +43,26 @@ A regional portal site for western Kanagawa prefecture (大和、小田原周辺
 - `coupons` - Per-shop coupons with isLineAccountCoupon flag, linked to shops via shopId
 
 ## Booking System (PostgreSQL, Per-Shop)
-- 全予約データはNeon PostgreSQLに永続化（`booking_staff`, `booking_courses`, `booking_reservations`, `booking_settings`テーブル）
+- 全予約データはNeon PostgreSQLに永続化（`booking_staff`, `booking_courses`, `booking_reservations`, `booking_settings`, `booking_slot_dates`テーブル）
 - 初回アクセス時に`initBookingTables()`でテーブルを自動作成
 - デモデータは`seedShopIfEmpty(shopId)`でコースが0件の店舗に自動挿入（shop 1: ラーメン店, shop 3: Hair Salon MIKU）
 - Staff-course relationships: courses own staff assignment (course.staffIds), staff.courseIds is computed server-side from courses
 - Customer booking flow has NO staff selection step (staff removed from customer-facing UI entirely)
 - Always uses `__shop__` as staffId for customer reservations; staff management is admin-only
-- Time slots: default 10:00-19:00 in 30min intervals
+- Time slots: generated from `open_time`〜`close_time` in 30min intervals (設定がない場合は10:00-19:00)
 - All booking API calls require shopId parameter (client passes via URL, admin via shop selector dropdown)
+
+### 営業時間・定休日設定（booking_settings拡張カラム）
+- `open_time TEXT` / `close_time TEXT` - 営業開始・終了時間（例: "11:00", "22:00"）
+- `closed_dow TEXT` - 定休曜日（カンマ区切り数字、0=日〜6=土。例: "3" = 水曜定休）
+- `closed_newyear BOOLEAN` - 年末年始定休フラグ（12/29〜1/3を全て受付不可）
+
+### 日付単位スロット管理（booking_slot_dates テーブル）
+- PRIMARY KEY: (shop_id, staff_id, date, time)
+- `available BOOLEAN` - その日時の受付可否を上書き
+- 顧客向け `GET /api/shops/:shopId/slots` は営業時間外・定休曜日・年末年始・日付上書きを全て反映
+- 管理画面の予約枠管理：列ヘッダーの「一括」クリックで日付単位のON/OFF一括変更
+- 定休日は列がオレンジ背景＋禁止アイコンで表示され変更不可
 
 ## Favorites (localStorage)
 - `client/src/hooks/use-favorites.ts` - `useFavorites()` hook: toggle/check favorites stored in localStorage (`odekake-favorites` key)
@@ -71,9 +83,9 @@ A regional portal site for western Kanagawa prefecture (大和、小田原周辺
 - `client/src/pages/detail.tsx` - Detail page with Google Maps + coupons
 - `client/src/pages/reservation.tsx` - Multi-step booking flow
 - `client/src/pages/admin.tsx` - Admin dashboard (店舗設定・クーポン管理のみ)
-- `client/src/pages/shop-admin.tsx` - Per-shop management page (コース・スタッフ・予約枠・予約一覧)
+- `client/src/pages/shop-admin.tsx` - Per-shop management page (8タブ: 画像・メニュー・コース・スタッフ・予約枠・予約一覧・予約設定・決済)。`ShopSettingsPanel`で営業時間・定休曜日・年末年始設定
 - `client/src/components/booking/` - CourseSelect, CourseDetail, StaffSelect, DateTimeSelect, PaymentConfirm, BookingComplete
-- `client/src/components/admin/` - CourseManagement, StaffManagement, SlotManagement, ReservationList
+- `client/src/components/admin/` - CourseManagement, StaffManagement, SlotManagement（日付グリッド・一括切替対応）, ReservationList
 - `client/src/hooks/use-favorites.ts` - Favorites hook (localStorage, listener sync)
 - `client/src/lib/data.ts` - Helper functions (area/category names, sorting, update detection)
 
@@ -84,6 +96,8 @@ A regional portal site for western Kanagawa prefecture (大和、小田原周辺
 - Orange badge for recently updated shops (within 1 week)
 - Body background: gray-800 (simulates phone on dark surface)
 - Content scrolls within LINE frame independently
+- Hero banner: 下部アンバーグラデーション（`from-amber-900/90 via-amber-800/60`）＋テキスト左下配置
+- LINEヘッダーのクーポンウォレットボタン: `BadgePercent` アイコン（lucide-react）
 
 ## API Endpoints
 ### File Upload
@@ -105,8 +119,10 @@ A regional portal site for western Kanagawa prefecture (大和、小田原周辺
 - `GET/POST/PUT/DELETE /api/shops/:shopId/staff` - Staff CRUD
 - `GET/POST/PUT/DELETE /api/shops/:shopId/courses` - Course CRUD
 - `GET/POST/PUT/DELETE /api/shops/:shopId/reservations` - Reservation CRUD
-- `GET/PUT/POST /api/shops/:shopId/slots` - Time slot management
-- `GET/PUT /api/shops/:shopId/settings` - Store settings
+- `GET /api/shops/:shopId/slots` - 顧客向けスロット取得（営業時間・定休日・日付上書きを全反映）
+- `GET/PUT /api/shops/:shopId/settings` - Store settings（open_time/close_time/closed_dow/closed_newyear含む）
+- `GET/PUT /api/shops/:shopId/slot-dates` - 日付単位スロット上書き取得・更新
+- `POST /api/shops/:shopId/slot-dates/bulk` - 日付単位の一括ON/OFF
 - `GET/POST/PUT /api/shops/:shopId/inquiries` - Customer inquiries
 - `GET /api/shops/:shopId/cancel/:token` - Fetch reservation info by cancel token
 - `POST /api/shops/:shopId/cancel/:token` - Execute reservation cancel by token

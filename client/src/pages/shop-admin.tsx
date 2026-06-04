@@ -6,7 +6,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useLogout } from "@/hooks/use-auth";
 import {
   Store,
@@ -27,12 +26,6 @@ import {
   CircleDashed,
   ExternalLink,
   Unlink,
-  Phone,
-  Mail,
-  MapPin,
-  CalendarOff,
-  FileText,
-  Loader2
 } from "lucide-react";
 import { SiStripe } from "react-icons/si";
 import type { Shop } from "@shared/schema";
@@ -44,155 +37,11 @@ import { SlotManagement } from "@/components/admin/slot-management";
 import { ReservationList } from "@/components/admin/reservation-list";
 import { MenuManagement } from "@/components/admin/menu-management";
 import { fetchSettings, updateSettings } from "@/lib/booking-api";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
-type ShopAdminTab = "stores" | "images" | "menu" | "courses" | "staff" | "slots" | "reservations" | "settings" | "payment";
-
-function StoreInfoSettings({ shopId }: { shopId: number }) {
-  const { toast } = useToast();
-  const [loaded, setLoaded] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  // 店舗情報専用のState
-  const [storeName, setStoreName] = useState("");
-  const [storeDescription, setStoreDescription] = useState("");
-  const [storeAddress, setStoreAddress] = useState("");
-  const [storePhone, setStorePhone] = useState("");
-  const [storeEmail, setStoreEmail] = useState("");
-  const [storeHours, setStoreHours] = useState("");
-  const [storeClosedDays, setStoreClosedDays] = useState("");
-
-  useEffect(() => {
-    // 既存の取得関数を流用
-    fetchSettings(shopId).then((s) => {
-      setStoreName(s.store_name ?? "");
-      setStoreDescription(s.store_description ?? "");
-      setStoreAddress(s.store_address ?? "");
-      setStorePhone(s.store_phone ?? "");
-      setStoreEmail(s.store_email ?? "");
-      setStoreHours(s.store_hours ?? "");
-      setStoreClosedDays(s.store_closed_days ?? "");
-      setLoaded(true);
-    });
-  }, [shopId]);
-
-  // useEffect(() => {
-  //   // 既存の取得関数を流用
-  //   fetchSettings(shopId).then((s) => {
-  //     setStoreName(s.shop_info_name ?? "");
-  //     setStoreDescription(s.shop_info_description ?? "");
-  //     setStoreAddress(s.shop_info_address ?? "");
-  //     setStorePhone(s.shop_info_phone ?? "");
-  //     setStoreEmail(s.store_email ?? "");
-  //     setStoreHours(s.shop_info_hours ?? "");
-  //     setStoreClosedDays(s.store_closed_days ?? "");
-  //     setLoaded(true);
-  //   });
-  // }, [shopId]);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await updateSettings(shopId, {
-        store_name: storeName,
-        store_description: storeDescription,
-        store_address: storeAddress,
-        store_phone: storePhone,
-        store_email: storeEmail,
-        store_hours: storeHours,
-        store_closed_days: storeClosedDays,
-      });
-      toast({ title: "店舗情報を更新しました" });
-    } catch {
-      toast({ title: "保存に失敗しました", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (!loaded) return <div className="py-10 text-center text-muted-foreground text-sm">読み込み中...</div>;
-
-  return (
-    <div data-testid="admin-shop-info-settings" className="space-y-4">
-      <div className="mb-4">
-        <h2 className="text-lg font-bold text-foreground">店舗情報の設定</h2>
-        <p className="text-sm text-muted-foreground">予約ページに表示される店舗の基本情報を編集</p>
-      </div>
-
-      <Card className="p-5 space-y-6">
-        {/* 基本情報セクション */}
-        <div className="grid gap-6 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="storeName" className="flex items-center gap-1.5 text-sm font-semibold">
-              <Store className="h-4 w-4 text-primary" /> 店名
-            </Label>
-            <Input id="storeName" value={storeName} onChange={(e) => setStoreName(e.target.value)} placeholder="例: サロン・ド・サンプル" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="storePhone" className="flex items-center gap-1.5 text-sm font-semibold">
-              <Phone className="h-4 w-4 text-primary" /> 電話番号
-            </Label>
-            <Input id="storePhone" value={storePhone} onChange={(e) => setStorePhone(e.target.value)} placeholder="03-xxxx-xxxx" />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="storeEmail" className="flex items-center gap-1.5 text-sm font-semibold">
-            <Mail className="h-4 w-4 text-primary" /> メールアドレス
-          </Label>
-          <Input id="storeEmail" type="email" value={storeEmail} onChange={(e) => setStoreEmail(e.target.value)} placeholder="info@example.com" />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="storeAddress" className="flex items-center gap-1.5 text-sm font-semibold">
-            <MapPin className="h-4 w-4 text-primary" /> 住所
-          </Label>
-          <Input id="storeAddress" value={storeAddress} onChange={(e) => setStoreAddress(e.target.value)} placeholder="東京都世田谷区..." />
-        </div>
-
-        {/* 営業スケジュールセクション */}
-        <div className="grid gap-6 sm:grid-cols-2 border-t pt-5">
-          <div className="space-y-2">
-            <Label htmlFor="storeHours" className="flex items-center gap-1.5 text-sm font-semibold">
-              <Clock className="h-4 w-4 text-primary" /> 営業時間
-            </Label>
-            <Input id="storeHours" value={storeHours} onChange={(e) => setStoreHours(e.target.value)} placeholder="10:00 〜 19:00" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="storeClosedDays" className="flex items-center gap-1.5 text-sm font-semibold">
-              <CalendarOff className="h-4 w-4 text-primary" /> 定休日
-            </Label>
-            <Input id="storeClosedDays" value={storeClosedDays} onChange={(e) => setStoreClosedDays(e.target.value)} placeholder="毎週火曜日、第3日曜日" />
-          </div>
-        </div>
-
-        {/* 紹介文セクション */}
-        <div className="border-t pt-5 space-y-2">
-          <Label htmlFor="storeDescription" className="flex items-center gap-1.5 text-sm font-semibold">
-            <FileText className="h-4 w-4 text-primary" /> 店舗紹介文
-          </Label>
-          <Textarea 
-            id="storeDescription"
-            value={storeDescription} 
-            onChange={(e) => setStoreDescription(e.target.value)} 
-            placeholder="お店の特徴やコンセプトを入力してください"
-            className="min-h-[120px] resize-none"
-          />
-        </div>
-
-        <div className="pt-2">
-          <Button 
-            onClick={handleSave} 
-            disabled={saving} 
-            className="w-full sm:w-auto min-w-[140px]"
-          >
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            {saving ? "保存中..." : "店舗情報を保存"}
-          </Button>
-        </div>
-      </Card>
-    </div>
-  );
-}
+type ShopAdminTab = "images" | "menu" | "courses" | "staff" | "slots" | "reservations" | "settings" | "payment";
 
 function ImageUploadSlot({
   label,
@@ -450,41 +299,67 @@ function StripeConnectPanel({ shopId }: { shopId: number }) {
   );
 }
 
+const TIME_OPTIONS = Array.from({ length: 33 }, (_, i) => {
+  const totalMin = 7 * 60 + i * 30;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+});
+
+const DOW_LABELS = [
+  { value: 0, label: "日" },
+  { value: 1, label: "月" },
+  { value: 2, label: "火" },
+  { value: 3, label: "水" },
+  { value: 4, label: "木" },
+  { value: 5, label: "金" },
+  { value: 6, label: "土" },
+];
+
 function ShopSettingsPanel({ shopId }: { shopId: number }) {
   const { toast } = useToast();
   const [tableCount, setTableCount] = useState("");
   const [maxPartySize, setMaxPartySize] = useState("");
   const [staffSelectionEnabled, setStaffSelectionEnabled] = useState(false);
+  const [openTime, setOpenTime] = useState("10:00");
+  const [closeTime, setCloseTime] = useState("19:00");
+  const [closedDow, setClosedDow] = useState<Set<number>>(new Set());
+  const [closedNewYear, setClosedNewYear] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchSettings(shopId).then((s) => {
       setTableCount(s.table_count ?? "");
       setMaxPartySize(s.max_party_size ?? "");
-      setStaffSelectionEnabled(s.staff_selection_enabled === true);
+      setStaffSelectionEnabled(s.staff_selection_enabled === "true");
+      setOpenTime(s.open_time || "10:00");
+      setCloseTime(s.close_time || "19:00");
+      const dow = (s.closed_dow || "").split(",").filter(Boolean).map(Number);
+      setClosedDow(new Set(dow));
+      setClosedNewYear(s.closed_newyear === "true" || s.closed_newyear === true);
       setLoaded(true);
     });
   }, [shopId]);
 
-  const [saving, setSaving] = useState(false);
+  const toggleDow = (d: number) => {
+    setClosedDow((prev) => {
+      const next = new Set(prev);
+      if (next.has(d)) next.delete(d); else next.add(d);
+      return next;
+    });
+  };
 
   const handleSave = async () => {
-    const isInvalidTable = !tableCount || parseInt(tableCount) < 1;
-    const isInvalidParty = !maxPartySize || parseInt(maxPartySize) < 1;
-
-    if (isInvalidTable || isInvalidParty) {
-      toast({ 
-        title: "入力エラー", 
-        description: "卓数と上限人数には1以上の数値を入力してください。", 
-        variant: "destructive" 
-      });
-      return;
-    }
     setSaving(true);
     try {
       await updateSettings(shopId, {
         table_count: tableCount || "0",
         max_party_size: maxPartySize || "0",
+        open_time: openTime,
+        close_time: closeTime,
+        closed_dow: Array.from(closedDow).sort().join(","),
+        closed_newyear: closedNewYear ? "true" : "false",
       });
       toast({ title: "設定を保存しました" });
     } catch {
@@ -496,77 +371,157 @@ function ShopSettingsPanel({ shopId }: { shopId: number }) {
 
   if (!loaded) return <div className="py-10 text-center text-muted-foreground text-sm">読み込み中...</div>;
 
-  if (staffSelectionEnabled) {
-    return (
-      <div data-testid="admin-shop-settings">
-        <div className="mb-4">
-          <h2 className="text-lg font-bold text-foreground">予約設定</h2>
-        </div>
-        <Card className="overflow-visible p-5">
-          <p className="text-sm text-muted-foreground">
-            スタッフ指名ありの店舗では、卓数・上限人数の設定は不要です。
-            スタッフ個別の予約枠管理をご利用ください。
-          </p>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div data-testid="admin-shop-settings">
       <div className="mb-4">
         <h2 className="text-lg font-bold text-foreground">予約設定</h2>
-        <p className="text-sm text-muted-foreground">指名なし予約の同時受付数と1予約あたりの上限人数を設定</p>
+        <p className="text-sm text-muted-foreground">営業時間・定休日・同時受付数を設定します</p>
       </div>
       <Card className="overflow-visible p-5 space-y-6">
+
+        {/* 営業時間 */}
         <div className="space-y-2">
-          <Label htmlFor="table-count" className="flex items-center gap-1.5 text-sm font-semibold">
-            <LayoutGrid className="h-4 w-4 text-primary" />
-            卓数（同時に受け付ける予約の最大数）
+          <Label className="flex items-center gap-1.5 text-sm font-semibold">
+            <Clock className="h-4 w-4 text-primary" />
+            営業時間
           </Label>
-          <div className="flex items-center gap-3 max-w-xs">
-          <Input
-            id="table-count"
-            type="number"
-            min="0"
-            max="100"
-            value={tableCount}
-            onChange={(e) => setTableCount(e.target.value)}
-            placeholder="例: 5"
-            className="w-28"
-            data-testid="input-table-count"
-          />
-            <span className="text-sm text-muted-foreground">卓 / 台 / 組</span>
+          <div className="flex items-center gap-3">
+            <Select value={openTime} onValueChange={setOpenTime}>
+              <SelectTrigger className="w-28" data-testid="select-open-time">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                {TIME_OPTIONS.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-muted-foreground">〜</span>
+            <Select value={closeTime} onValueChange={setCloseTime}>
+              <SelectTrigger className="w-28" data-testid="select-close-time">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                {TIME_OPTIONS.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <p className="text-xs text-muted-foreground">
-            同じ時間帯に受け付ける予約の最大数です。1以上の入力が必須です。
+            この時間帯のみ予約枠に表示されます。予約枠管理・お客様の予約画面に反映されます。
           </p>
         </div>
 
+        {/* 定休曜日 */}
         <div className="border-t pt-5 space-y-2">
-          <Label htmlFor="max-party-size" className="flex items-center gap-1.5 text-sm font-semibold">
-            <Users className="h-4 w-4 text-primary" />
-            1予約あたりの上限人数
+          <Label className="flex items-center gap-1.5 text-sm font-semibold">
+            <Settings className="h-4 w-4 text-primary" />
+            定休曜日
           </Label>
-          <div className="flex items-center gap-3 max-w-xs">
-            <Input
-              id="max-party-size"
-              type="number"
-              min="0"
-              max="100"
-              value={maxPartySize}
-              onChange={(e) => setMaxPartySize(e.target.value)}
-              placeholder="例: 6"
-              className="w-28"
-              data-testid="input-max-party-size"
-            />
-            <span className="text-sm text-muted-foreground">名まで</span>
+          <div className="flex flex-wrap gap-2" data-testid="closed-dow-checkboxes">
+            {DOW_LABELS.map(({ value, label }) => {
+              const checked = closedDow.has(value);
+              const isSun = value === 0;
+              const isSat = value === 6;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => toggleDow(value)}
+                  data-testid={`checkbox-dow-${value}`}
+                  className={`flex h-10 w-10 flex-col items-center justify-center rounded-lg border-2 text-sm font-bold transition-colors ${
+                    checked
+                      ? "border-orange-400 bg-orange-50 text-orange-600"
+                      : "border-border bg-background text-foreground hover:border-muted-foreground"
+                  } ${isSun ? "text-destructive" : isSat ? "text-blue-500" : ""}`}
+                >
+                  {label}
+                  {checked && <span className="text-[8px] leading-none text-orange-500">定休</span>}
+                </button>
+              );
+            })}
           </div>
           <p className="text-xs text-muted-foreground">
-            予約確認画面で選択できる人数の上限です。1以上の入力が必須です。<br />
-            店舗のジャンルが"グルメ"の場合は予約画面で人数の選択が可能となります。
+            選択した曜日は毎週定休日として扱われ、予約枠に「定休」と表示されます。
           </p>
         </div>
+
+        {/* 年末年始 */}
+        <div className="border-t pt-5 space-y-2">
+          <Label className="flex items-center gap-1.5 text-sm font-semibold">
+            <CalendarCheck className="h-4 w-4 text-primary" />
+            年末年始の定休
+          </Label>
+          <label className="flex items-center gap-3 cursor-pointer select-none" data-testid="checkbox-closed-newyear">
+            <div
+              role="checkbox"
+              aria-checked={closedNewYear}
+              onClick={() => setClosedNewYear((v) => !v)}
+              className={`h-5 w-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer ${
+                closedNewYear ? "border-orange-400 bg-orange-400" : "border-border bg-background"
+              }`}
+            >
+              {closedNewYear && <span className="text-white text-xs font-bold">✓</span>}
+            </div>
+            <span className="text-sm">12月29日〜1月3日を年末年始定休にする</span>
+          </label>
+          <p className="text-xs text-muted-foreground">
+            ONにすると12/29〜1/3の期間、全時間帯が受付不可になります。
+          </p>
+        </div>
+
+        {/* 卓数・人数（スタッフ指名なしの店舗のみ） */}
+        {!staffSelectionEnabled && (
+          <>
+            <div className="border-t pt-5 space-y-2">
+              <Label htmlFor="table-count" className="flex items-center gap-1.5 text-sm font-semibold">
+                <LayoutGrid className="h-4 w-4 text-primary" />
+                卓数（同時に受け付ける予約の最大数）
+              </Label>
+              <div className="flex items-center gap-3 max-w-xs">
+                <Input
+                  id="table-count"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={tableCount}
+                  onChange={(e) => setTableCount(e.target.value)}
+                  placeholder="例: 5"
+                  className="w-28"
+                  data-testid="input-table-count"
+                />
+                <span className="text-sm text-muted-foreground">卓 / 台 / 組</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                同じ時間帯に受け付ける予約の最大数です。0または空欄の場合はスタッフの空き状況で制御されます。
+              </p>
+            </div>
+            <div className="border-t pt-5 space-y-2">
+              <Label htmlFor="max-party-size" className="flex items-center gap-1.5 text-sm font-semibold">
+                <Users className="h-4 w-4 text-primary" />
+                1予約あたりの上限人数
+              </Label>
+              <div className="flex items-center gap-3 max-w-xs">
+                <Input
+                  id="max-party-size"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={maxPartySize}
+                  onChange={(e) => setMaxPartySize(e.target.value)}
+                  placeholder="例: 6"
+                  className="w-28"
+                  data-testid="input-max-party-size"
+                />
+                <span className="text-sm text-muted-foreground">名まで</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                予約確認画面で選択できる人数の上限です。0または空欄の場合は最大20名まで選択可能です。
+              </p>
+            </div>
+          </>
+        )}
 
         <Button
           onClick={handleSave}
@@ -686,14 +641,13 @@ export default function ShopAdminPage() {
   const params = useParams<{ id: string }>();
   const shopId = parseInt(params.id || "0");
 
-  const [activeTab, setActiveTab] = useState<ShopAdminTab>("stores");
+  const [activeTab, setActiveTab] = useState<ShopAdminTab>("images");
 
   const { data: shop, isLoading } = useQuery<Shop>({
     queryKey: ["/api/shops", params.id],
   });
 
   const tabs: { id: ShopAdminTab; label: string; icon: typeof Store }[] = [
-    { id: "stores", label: "店舗管理", icon: Store },
     { id: "images", label: "画像管理", icon: ImageIcon },
     { id: "menu", label: "メニュー管理", icon: LayoutGrid },
     { id: "courses", label: "コース管理", icon: ListOrdered },
@@ -781,7 +735,7 @@ export default function ShopAdminPage() {
             );
           })}
         </div>
-        {activeTab === "stores" && <StoreInfoSettings shopId={shopId} />}
+
         {activeTab === "images" && <ImageManagement shop={shop} />}
         {activeTab === "menu" && <MenuManagement shopId={shopId} />}
         {activeTab === "courses" && <CourseManagement shopId={shopId} />}

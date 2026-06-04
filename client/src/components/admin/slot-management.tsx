@@ -1,26 +1,48 @@
 import { useState, useMemo, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Check, X, Loader2 } from "lucide-react";
-import { fetchStaff, fetchSlots, fetchSettings, bulkUpdateSlots, updateSlot, SHOP_STAFF_ID, type Staff } from "@/lib/booking-api";
+import { ChevronLeft, ChevronRight, Check, X, Loader2, Ban } from "lucide-react";
+import { fetchStaff, fetchSettings, SHOP_STAFF_ID, type Staff, type StoreSettings } from "@/lib/booking-api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  format, startOfWeek, addDays, addWeeks, subWeeks,
-} from "date-fns";
+import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { ja } from "date-fns/locale";
 
-interface SlotState {
+interface SlotDateOverrides {
   [key: string]: boolean;
 }
 
-const TIMES = Array.from({ length: 19 }, (_, i) => {
-  const h = Math.floor(i / 2) + 10;
-  const m = i % 2 === 0 ? "00" : "30";
-  return `${h}:${m}`;
-}).filter((t) => t !== "19:30");
+function timeToMin(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function generateTimes(openTime: string, closeTime: string): string[] {
+  const start = timeToMin(openTime || "10:00");
+  const end = timeToMin(closeTime || "19:00");
+  const times: string[] = [];
+  for (let m = start; m < end; m += 30) {
+    times.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
+  }
+  return times;
+}
+
+function parseDow(val: string | undefined | boolean): number[] {
+  if (!val || typeof val === "boolean") return [];
+  return String(val).split(",").map(Number).filter((n) => !isNaN(n));
+}
+
+function isNewYearDate(date: Date): boolean {
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  return (m === 12 && d >= 29) || (m === 1 && d <= 3);
+}
+
+function toDateKey(date: Date): string {
+  return format(date, "yyyy-MM-dd");
+}
+
+const DOW_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
 
 export function SlotManagement({ shopId }: { shopId: number }) {
   const [staffList, setStaffList] = useState<Staff[]>([]);
@@ -29,100 +51,110 @@ export function SlotManagement({ shopId }: { shopId: number }) {
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
   const [selectedStaff, setSelectedStaff] = useState<string>("");
-  const [slotStates, setSlotStates] = useState<SlotState>({});
   const [staffEnabled, setStaffEnabled] = useState(true);
-  const [storeOpenTime, setStoreOpenTime] = useState("10:00");
-  const [storeCloseTime, setStoreCloseTime] = useState("19:00");
-  const [timesToDisplay, setTimesToDisplay] = useState(TIMES);
-  const [saveLoading, setSaveLoading] = useState(false);
+  const [settings, setSettings] = useState<StoreSettings | null>(null);
+  const [overrides, setOverrides] = useState<SlotDateOverrides>({});
+  const [savingKey, setSavingKey] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchStaff(shopId), fetchSettings(shopId)]).then(([s, settings]) => {
-      setStaffList(s);
-      const enabled = settings.staff_selection_enabled === true;
-      setStaffEnabled(enabled);
-      const ot = settings.store_open_time || "10:00";
-      const ct = settings.store_close_time || "19:00";
-      setStoreOpenTime(ot);
-      setStoreCloseTime(ct);
-      const times: string[] = [];
-      const [oh] = ot.split(":").map(Number);
-      const [ch] = ct.split(":").map(Number);
-      for (let h = oh; h < ch; h++) {
-        times.push(`${String(h).padStart(2, "0")}:00`);
-        if (h < ch - 1) times.push(`${String(h).padStart(2, "0")}:30`);
-      }
-      setTimesToDisplay(times);
-      if (enabled && s.length > 0) {
-        setSelectedStaff(s[0].id);
-      } else if (!enabled) {
-        setSelectedStaff(SHOP_STAFF_ID);
-      }
-    }).catch(() => {
-      setStaffList([]);
-    }).finally(() => setLoading(false));
+    Promise.all([fetchStaff(shopId), fetchSettings(shopId)])
+      .then(([s, st]) => {
+        setStaffList(s);
+        setSettings(st);
+        const enabled = st.staff_selection_enabled === "true";
+        setStaffEnabled(enabled);
+        if (enabled && s.length > 0) setSelectedStaff(s[0].id);
+        else setSelectedStaff(SHOP_STAFF_ID);
+      })
+      .catch(() => setStaffList([]))
+      .finally(() => setLoading(false));
   }, [shopId]);
+
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i)),
+    [currentWeekStart]
+  );
 
   useEffect(() => {
     if (!selectedStaff) return;
-    fetchSlots(shopId, selectedStaff).then((slots) => {
-      const states: SlotState = {};
-      slots.forEach((s) => {
-        const slot = s as unknown as { day_of_week: number; time: string; available: boolean };
-        states[`${selectedStaff}-${slot.day_of_week}-${slot.time}`] = slot.available;
-      });
-      setSlotStates(states);
-    });
-  }, [selectedStaff, shopId]);
+    const from = toDateKey(weekDays[0]);
+    const to = toDateKey(weekDays[6]);
+    fetch(`/api/shops/${shopId}/slot-dates?staffId=${encodeURIComponent(selectedStaff)}&from=${from}&to=${to}`)
+      .then((r) => r.json())
+      .then((rows: { date: string; time: string; available: boolean }[]) => {
+        const map: SlotDateOverrides = {};
+        rows.forEach((r) => { map[`${r.date}|${r.time}`] = r.available; });
+        setOverrides(map);
+      })
+      .catch(() => {});
+  }, [selectedStaff, shopId, currentWeekStart, weekDays]);
 
-  const weekDays = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
-  }, [currentWeekStart]);
+  const TIMES = useMemo(
+    () => generateTimes(settings?.open_time || "10:00", settings?.close_time || "19:00"),
+    [settings?.open_time, settings?.close_time]
+  );
 
-  const toggleSlot = async (dayIndex: number, time: string) => {
-    const dayOfWeek = weekDays[dayIndex].getDay();
-    const key = `${selectedStaff}-${dayOfWeek}-${time}`;
-    const newVal = !(slotStates[key] ?? true);
-    setSlotStates((prev) => ({ ...prev, [key]: newVal }));
-    await updateSlot(shopId, selectedStaff, dayOfWeek, time, newVal);
-  };
+  const closedDow = useMemo(() => parseDow(settings?.closed_dow), [settings?.closed_dow]);
+  const closedNewYear = settings?.closed_newyear === "true" || settings?.closed_newyear === true;
 
-  const toggleDayAll = async (dayIndex: number) => {
-    const dayOfWeek = weekDays[dayIndex].getDay();
-    const allOpen = timesToDisplay.every((time) => slotStates[`${selectedStaff}-${dayOfWeek}-${time}`] ?? true);
-    const newStates = { ...slotStates };
-    timesToDisplay.forEach((time) => {
-      newStates[`${selectedStaff}-${dayOfWeek}-${time}`] = !allOpen;
-    });
-    setSlotStates(newStates);
-    await bulkUpdateSlots(shopId, selectedStaff, dayOfWeek, timesToDisplay, !allOpen);
-  };
+  function getClosedInfo(date: Date): { closed: boolean; reason: string } {
+    const dow = date.getDay();
+    if (closedDow.includes(dow)) return { closed: true, reason: `定休（${DOW_NAMES[dow]}）` };
+    if (closedNewYear && isNewYearDate(date)) return { closed: true, reason: "年末年始" };
+    return { closed: false, reason: "" };
+  }
 
-  const saveBusinessHours = async () => {
-    setSaveLoading(true);
+  function getCellAvailable(date: Date, time: string): boolean {
+    const { closed } = getClosedInfo(date);
+    if (closed) return false;
+    const key = `${toDateKey(date)}|${time}`;
+    return key in overrides ? overrides[key] : true;
+  }
+
+  const toggleCell = async (date: Date, time: string) => {
+    const { closed } = getClosedInfo(date);
+    if (closed) return;
+    const dk = toDateKey(date);
+    const key = `${dk}|${time}`;
+    const next = !(key in overrides ? overrides[key] : true);
+    setOverrides((prev) => ({ ...prev, [key]: next }));
+    setSavingKey(key);
     try {
-      const response = await fetch(`/api/shops/${shopId}/settings`, {
+      await fetch(`/api/shops/${shopId}/slot-dates`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          store_open_time: storeOpenTime,
-          store_close_time: storeCloseTime,
-        }),
+        body: JSON.stringify({ staffId: selectedStaff, date: dk, time, available: next }),
       });
-      if (response.ok) {
-        const times: string[] = [];
-        const [oh] = storeOpenTime.split(":").map(Number);
-        const [ch] = storeCloseTime.split(":").map(Number);
-        for (let h = oh; h < ch; h++) {
-          times.push(`${String(h).padStart(2, "0")}:00`);
-          if (h < ch - 1) times.push(`${String(h).padStart(2, "0")}:30`);
-        }
-        setTimesToDisplay(times);
-      }
     } finally {
-      setSaveLoading(false);
+      setSavingKey(null);
     }
+  };
+
+  const toggleDate = async (date: Date) => {
+    const { closed } = getClosedInfo(date);
+    if (closed) return;
+    const allOpen = TIMES.every((t) => getCellAvailable(date, t));
+    const next = !allOpen;
+    const dk = toDateKey(date);
+    const newOverrides = { ...overrides };
+    TIMES.forEach((t) => { newOverrides[`${dk}|${t}`] = next; });
+    setOverrides(newOverrides);
+    setSavingKey(dk);
+    try {
+      await fetch(`/api/shops/${shopId}/slot-dates/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ staffId: selectedStaff, date: dk, times: TIMES, available: next }),
+      });
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const changeWeek = async (dir: "prev" | "next") => {
+    setOverrides({});
+    setCurrentWeekStart((w) => (dir === "prev" ? subWeeks(w, 1) : addWeeks(w, 1)));
   };
 
   if (loading) {
@@ -138,8 +170,18 @@ export function SlotManagement({ shopId }: { shopId: number }) {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-foreground">予約枠管理</h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground flex items-center gap-2">
             {staffEnabled ? "スタッフごとの予約受付時間を設定" : "店舗の予約受付時間を設定"}
+            {settings?.open_time && settings?.close_time && (
+              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded font-medium">
+                {settings.open_time}〜{settings.close_time}
+              </span>
+            )}
+            {closedDow.length > 0 && (
+              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-medium">
+                定休：{closedDow.map((d) => DOW_NAMES[d]).join("・")}
+              </span>
+            )}
           </p>
         </div>
       </div>
@@ -161,57 +203,24 @@ export function SlotManagement({ shopId }: { shopId: number }) {
           </div>
         )}
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentWeekStart(subWeeks(currentWeekStart, 1))} data-testid="button-prev-week">
+          <Button
+            variant="outline" size="icon" className="h-8 w-8"
+            onClick={() => changeWeek("prev")}
+            data-testid="button-prev-week"
+          >
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm font-medium text-foreground min-w-[200px] text-center">
             {format(weekDays[0], "M月d日", { locale: ja })} - {format(weekDays[6], "M月d日", { locale: ja })}
           </span>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))} data-testid="button-next-week">
+          <Button
+            variant="outline" size="icon" className="h-8 w-8"
+            onClick={() => changeWeek("next")}
+            data-testid="button-next-week"
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-      </div>
-
-      <div className="mb-6 rounded-lg border border-border bg-card p-4">
-        <h3 className="text-sm font-semibold text-foreground mb-3">営業時間設定</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="open-time" className="text-sm text-foreground">開店時間</Label>
-            <Input
-              id="open-time"
-              type="time"
-              value={storeOpenTime}
-              onChange={(e) => setStoreOpenTime(e.target.value)}
-              className="text-sm"
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="close-time" className="text-sm text-foreground">閉店時間</Label>
-            <Input
-              id="close-time"
-              type="time"
-              value={storeCloseTime}
-              onChange={(e) => setStoreCloseTime(e.target.value)}
-              className="text-sm"
-            />
-          </div>
-        </div>
-        <Button
-          onClick={saveBusinessHours}
-          disabled={saveLoading}
-          className="mt-4 w-full md:w-auto"
-          data-testid="button-save-business-hours"
-        >
-          {saveLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              保存中...
-            </>
-          ) : (
-            "営業時間を保存"
-          )}
-        </Button>
       </div>
 
       <div className="mb-3 flex items-center gap-4">
@@ -223,6 +232,10 @@ export function SlotManagement({ shopId }: { shopId: number }) {
           <div className="h-4 w-4 rounded-sm bg-muted border border-border" />
           <span className="text-xs text-muted-foreground">受付不可</span>
         </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-4 w-4 rounded-sm bg-orange-100 border border-orange-200" />
+          <span className="text-xs text-muted-foreground">定休日</span>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border bg-card">
@@ -232,59 +245,105 @@ export function SlotManagement({ shopId }: { shopId: number }) {
               <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left text-xs font-medium text-muted-foreground w-[70px]">
                 時間
               </th>
-              {weekDays.map((day, i) => (
-                <th key={i} className="px-1 py-2 text-center">
-                  <button
-                    onClick={() => toggleDayAll(i)}
-                    className="flex flex-col items-center gap-0.5 w-full rounded-md px-2 py-1 transition-colors hover:bg-muted"
-                    data-testid={`slot-day-header-${i}`}
-                  >
-                    <span className={`text-[10px] font-medium ${
-                      day.getDay() === 0 ? "text-destructive" : day.getDay() === 6 ? "text-blue-500" : "text-muted-foreground"
-                    }`}>
-                      {format(day, "E", { locale: ja })}
-                    </span>
-                    <span className={`text-sm font-bold ${
-                      day.getDay() === 0 ? "text-destructive" : day.getDay() === 6 ? "text-blue-500" : "text-foreground"
-                    }`}>
-                      {format(day, "d")}
-                    </span>
-                  </button>
-                </th>
-              ))}
+              {weekDays.map((day, i) => {
+                const { closed, reason } = getClosedInfo(day);
+                const isSun = day.getDay() === 0;
+                const isSat = day.getDay() === 6;
+                const isSaving = savingKey === toDateKey(day);
+                return (
+                  <th key={i} className={`px-1 py-2 text-center ${closed ? "bg-orange-50" : ""}`}>
+                    <button
+                      onClick={() => toggleDate(day)}
+                      disabled={closed || isSaving}
+                      className={`flex flex-col items-center gap-0.5 w-full rounded-md px-2 py-1 transition-colors ${
+                        closed
+                          ? "cursor-default"
+                          : "hover:bg-muted active:bg-muted/80"
+                      }`}
+                      data-testid={`slot-day-header-${i}`}
+                      title={closed ? reason : "クリックして一括変更"}
+                    >
+                      <span className={`text-[10px] font-medium ${
+                        isSun ? "text-destructive" : isSat ? "text-blue-500" : "text-muted-foreground"
+                      }`}>
+                        {format(day, "E", { locale: ja })}
+                      </span>
+                      <span className={`text-sm font-bold ${
+                        isSun ? "text-destructive" : isSat ? "text-blue-500" : "text-foreground"
+                      }`}>
+                        {format(day, "d")}
+                      </span>
+                      {isSaving ? (
+                        <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
+                      ) : closed ? (
+                        <span className="text-[9px] text-orange-600 font-semibold leading-tight">{reason}</span>
+                      ) : (
+                        <span className="text-[9px] text-muted-foreground/50">一括</span>
+                      )}
+                    </button>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {timesToDisplay.map((time) => (
+            {TIMES.map((time) => (
               <tr key={time} className="border-b border-border last:border-0">
                 <td className="sticky left-0 z-10 bg-card px-3 py-0.5 text-xs text-muted-foreground font-mono">
                   {time}
                 </td>
                 {weekDays.map((day, dayIndex) => {
-                  const dayOfWeek = day.getDay();
-                  const key = `${selectedStaff}-${dayOfWeek}-${time}`;
-                  const isOpen = slotStates[key] ?? true;
+                  const { closed } = getClosedInfo(day);
+                  const key = `${toDateKey(day)}|${time}`;
+                  const isOpen = getCellAvailable(day, time);
+                  const isSaving = savingKey === key || savingKey === toDateKey(day);
                   return (
-                    <td key={dayIndex} className="px-1 py-0.5 text-center">
+                    <td
+                      key={dayIndex}
+                      className={`px-1 py-0.5 text-center ${closed ? "bg-orange-50/40" : ""}`}
+                    >
                       <button
-                        onClick={() => toggleSlot(dayIndex, time)}
+                        onClick={() => toggleCell(day, time)}
+                        disabled={closed || isSaving}
                         className={`mx-auto flex h-6 w-full max-w-[80px] items-center justify-center rounded-sm text-[10px] font-medium transition-colors ${
-                          isOpen
-                            ? "bg-[#06C755]/15 text-[#06C755] hover:bg-[#06C755]/25"
-                            : "bg-muted text-muted-foreground/40 hover:bg-muted/80"
+                          closed
+                            ? "bg-orange-100/70 text-orange-300 cursor-default"
+                            : isSaving
+                              ? "bg-muted text-muted-foreground/30 cursor-wait"
+                              : isOpen
+                                ? "bg-[#06C755]/15 text-[#06C755] hover:bg-[#06C755]/25"
+                                : "bg-muted text-muted-foreground/40 hover:bg-muted/80"
                         }`}
                         data-testid={`slot-${dayIndex}-${time}`}
                       >
-                        {isOpen ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                        {isSaving ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : closed ? (
+                          <Ban className="h-3 w-3" />
+                        ) : isOpen ? (
+                          <Check className="h-3 w-3" />
+                        ) : (
+                          <X className="h-3 w-3" />
+                        )}
                       </button>
                     </td>
                   );
                 })}
               </tr>
             ))}
+            {TIMES.length === 0 && (
+              <tr>
+                <td colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                  営業時間が設定されていません。「予約設定」タブで営業時間を設定してください。
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        日付の見出しをクリックすると、その日の全時間帯を一括で受付可/不可に切り替えます（その日のみ）。定休日は変更できません。
+      </p>
     </div>
   );
 }

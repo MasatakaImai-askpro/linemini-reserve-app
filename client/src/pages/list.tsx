@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import { useBasePath } from "@/hooks/use-base-path";
+import { useSEO, AREA_SEO, CATEGORY_SEO } from "@/lib/seo";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +89,29 @@ export default function ListPage() {
 
   const hasFilters = area !== "all" || category !== "all" || subcategory !== "all" || keyword !== "" || favOnly;
   const isWeb = basePath === "/web";
+
+  const areaSeo = area !== "all" ? AREA_SEO[area] : null;
+  const categorySeo = category !== "all" ? CATEGORY_SEO[category] : null;
+  const seoTitle = areaSeo && categorySeo
+    ? `${areaSeo.label}の${categorySeo.label} 予約・クーポン`
+    : areaSeo
+    ? `${areaSeo.label}の飲食店・美容室・エステ 予約・クーポン`
+    : categorySeo
+    ? `神奈川の${categorySeo.label} 予約・クーポン`
+    : keyword
+    ? `「${keyword}」の検索結果`
+    : "神奈川の飲食店・美容室・エステ 予約・クーポン一覧";
+  const seoDesc = areaSeo?.description || categorySeo?.description ||
+    "神奈川県（厚木・小田原・海老名・相模原）の飲食店・美容室・エステサロン・ラーメン・居酒屋をオンライン予約。LINEクーポン配信中。";
+  const seoKw = [areaSeo?.keywords, categorySeo?.keywords].filter(Boolean).join(",") ||
+    "神奈川,厚木,小田原,海老名,相模原,飲食店,美容室,エステ,ラーメン,居酒屋,予約,クーポン";
+
+  useSEO({
+    title: seoTitle,
+    description: seoDesc,
+    keywords: seoKw,
+    canonical: `/app/list${area !== "all" ? `?area=${area}` : ""}${category !== "all" ? `${area !== "all" ? "&" : "?"}category=${category}` : ""}`,
+  });
 
   return (
     <div className={`bg-background ${isWeb ? "max-w-6xl mx-auto px-6 py-6" : "px-3 py-3"}`}>
@@ -224,11 +248,11 @@ export default function ListPage() {
         <footer className="text-center py-4 mt-4">
           <Link href={basePath}>
             <span className="text-xs font-bold text-primary cursor-pointer" data-testid="link-footer-home">
-              神奈川おでかけナビ
+              かながわスマイルマップ
             </span>
           </Link>
           <p className="text-[10px] text-muted-foreground mt-1">
-            &copy; 2026 神奈川おでかけナビ
+            &copy; 2026 かながわスマイルマップ
           </p>
         </footer>
       )}

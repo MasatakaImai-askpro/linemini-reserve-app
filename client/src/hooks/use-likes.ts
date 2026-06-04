@@ -41,55 +41,39 @@ const listeners = new Set<() => void>();
 function notify() {
   listeners.forEach((fn) => fn());
 }
-export function useLikes(shopId: number, initialCount: number) {
+
+export function useLikes(shopId: number) {
   const [liked, setLiked] = useState<boolean>(() => loadLiked().includes(shopId));
-  const [count, setCount] = useState<number>(initialCount);
+  const [count, setCount] = useState<number>(() => {
+    const counts = loadCounts();
+    return counts[shopId] ?? seedCount(shopId);
+  });
 
   useEffect(() => {
-    setCount(initialCount);
-    setLiked(loadLiked().includes(shopId));
-
     const sync = () => {
       setLiked(loadLiked().includes(shopId));
-      const updatedCounts = loadCounts();
-      if (updatedCounts[shopId] !== undefined) {
-        setCount(updatedCounts[shopId]);
-      }
+      const counts = loadCounts();
+      setCount(counts[shopId] ?? seedCount(shopId));
     };
-    
     listeners.add(sync);
-    return () => { 
-      listeners.delete(sync); 
-    };
-  }, [shopId, initialCount]);
+    return () => { listeners.delete(sync); };
+  }, [shopId]);
 
-  const like = useCallback(async () => {
+  const like = useCallback(() => {
     const currentLiked = loadLiked();
     if (currentLiked.includes(shopId)) return;
 
-    try {
-      const response = await fetch(`/api/shops/${shopId}/like`, {
-        method: "POST",
-      });
+    const nextLiked = [...currentLiked, shopId];
+    saveLiked(nextLiked);
 
-      if (response.ok) {
-        const data = await response.json(); 
+    const counts = loadCounts();
+    const newCount = (counts[shopId] ?? seedCount(shopId)) + 1;
+    counts[shopId] = newCount;
+    saveCounts(counts);
 
-        // 画面の状態を更新
-        setLiked(true);
-        setCount(data.likeCount);
-        const nextLiked = [...currentLiked, shopId];
-        saveLiked(nextLiked);
-
-        const counts = loadCounts();
-        counts[shopId] = data.likeCount;
-        saveCounts(counts);
-
-        notify();
-      }
-    } catch (error) {
-      console.error("いいね送信に失敗しました:", error);
-    }
+    setLiked(true);
+    setCount(newCount);
+    notify();
   }, [shopId]);
 
   return { liked, count, like };

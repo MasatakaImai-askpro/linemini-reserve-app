@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 
-const STORAGE_KEY = "odekake-favorites";
+const STORAGE_KEY = "smile-map-favorites";
 
 function loadFavorites(): number[] {
   try {

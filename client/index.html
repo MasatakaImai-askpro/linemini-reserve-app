@@ -1,17 +1,194 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" prefix="og: https://ogp.me/ns#">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+
+    <!-- ===== Primary Meta ===== -->
+    <title>かながわスマイルマップ | 厚木・小田原・海老名・相模原の飲食店・美容室 予約&クーポン</title>
+    <meta name="description" content="神奈川県（厚木・小田原・海老名・相模原）の飲食店・美容室・エステサロン・ラーメン・居酒屋をオンライン予約。本厚木・相模大野・橋本・小田原・海老名駅周辺のお店をまとめてご紹介。LINEクーポン配信中。" />
+    <meta name="keywords" content="神奈川,厚木,厚木市,小田原,小田原市,海老名,海老名市,相模原,相模原市,本厚木,相模大野,橋本,海老名駅,小田原駅,町田,飲食店,美容室,ヘアサロン,エステサロン,ラーメン,居酒屋,カフェ,和食,予約,オンライン予約,クーポン,LINEクーポン,LINE,地域ポータル" />
+    <meta name="author" content="かながわスマイルマップ" />
+    <meta name="theme-color" content="#F57C00" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+
+    <!-- ===== Geo Meta ===== -->
+    <meta name="geo.region" content="JP-14" />
+    <meta name="geo.placename" content="神奈川県" />
+    <meta name="geo.position" content="35.4657;139.6221" />
+    <meta name="ICBM" content="35.4657, 139.6221" />
+
+    <!-- ===== Canonical ===== -->
+    <link rel="canonical" href="https://linemini-reserve-app.vercel.app/" />
+
+    <!-- ===== Open Graph ===== -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:site_name" content="かながわスマイルマップ" />
+    <meta property="og:title" content="かながわスマイルマップ | 厚木・小田原・海老名・相模原の飲食店・美容室 予約&クーポン" />
+    <meta property="og:description" content="神奈川県（厚木・小田原・海老名・相模原）の飲食店・美容室・エステサロン・ラーメン・居酒屋をオンライン予約。LINEクーポン配信中。" />
+    <meta property="og:url" content="https://linemini-reserve-app.vercel.app/" />
+    <meta property="og:image" content="https://linemini-reserve-app.vercel.app/images/hero-kanagawa.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="かながわスマイルマップ - 神奈川の店舗予約・クーポンポータル" />
+
+    <!-- ===== Twitter Card ===== -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="かながわスマイルマップ | 神奈川の飲食店・美容室 予約&クーポン" />
+    <meta name="twitter:description" content="厚木・小田原・海老名・相模原の飲食店・美容室・エステ・ラーメン・居酒屋をオンライン予約。LINEクーポン配信中。" />
+    <meta name="twitter:image" content="https://linemini-reserve-app.vercel.app/images/hero-kanagawa.png" />
+
+    <!-- ===== Favicon / PWA ===== -->
     <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="スマイルマップ" />
+
+    <!-- ===== Fonts ===== -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700;800;900&family=Architects+Daughter&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fira+Code:wght@300..700&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@100..900&family=Oxanium:wght@200..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&family=Roboto:ital,wght@0,100..900;1,100..900&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&family=Space+Grotesk:wght@300..700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
-    <title>かながわ西部おでかけナビ | 大和・小田原エリアのお店ポータル</title>
-    <meta name="description" content="神奈川県西部（大和・小田原・秦野・平塚・厚木・伊勢原）の商店街や組合加盟店をまとめてご紹介。お得なLINEクーポンも配信中！" />
-    <meta property="og:title" content="かながわ西部おでかけナビ" />
-    <meta property="og:description" content="大和・小田原エリアの商店街やお店をまとめてご紹介。お得なLINEクーポンも配信中！" />
-    <meta property="og:type" content="website" />
+
+    <!-- ===== JSON-LD Structured Data ===== -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://linemini-reserve-app.vercel.app/#website",
+          "name": "かながわスマイルマップ",
+          "url": "https://linemini-reserve-app.vercel.app",
+          "description": "神奈川県（厚木・小田原・海老名・相模原）の飲食店・美容室・エステサロンのオンライン予約とクーポンポータル",
+          "inLanguage": "ja",
+          "publisher": {
+            "@id": "https://linemini-reserve-app.vercel.app/#organization"
+          },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://linemini-reserve-app.vercel.app/app/list?q={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://linemini-reserve-app.vercel.app/#organization",
+          "name": "かながわスマイルマップ",
+          "url": "https://linemini-reserve-app.vercel.app",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://linemini-reserve-app.vercel.app/favicon.png",
+            "width": 192,
+            "height": 192
+          },
+          "description": "神奈川県（厚木・小田原・海老名・相模原）の地域密着型店舗予約・クーポンポータル",
+          "areaServed": [
+            {"@type": "City", "name": "厚木市", "containedInPlace": {"@type": "State", "name": "神奈川県"}},
+            {"@type": "City", "name": "小田原市", "containedInPlace": {"@type": "State", "name": "神奈川県"}},
+            {"@type": "City", "name": "海老名市", "containedInPlace": {"@type": "State", "name": "神奈川県"}},
+            {"@type": "City", "name": "相模原市", "containedInPlace": {"@type": "State", "name": "神奈川県"}}
+          ],
+          "knowsAbout": ["飲食店予約", "美容室予約", "エステサロン", "ラーメン", "居酒屋", "クーポン", "LINEミニアプリ"]
+        },
+        {
+          "@type": "WebPage",
+          "@id": "https://linemini-reserve-app.vercel.app/#webpage",
+          "url": "https://linemini-reserve-app.vercel.app/",
+          "name": "かながわスマイルマップ | 厚木・小田原・海老名・相模原の飲食店・美容室 予約&クーポン",
+          "description": "神奈川県（厚木・小田原・海老名・相模原）の飲食店・美容室・エステサロン・ラーメン・居酒屋をオンライン予約。LINEクーポン配信中。",
+          "isPartOf": {"@id": "https://linemini-reserve-app.vercel.app/#website"},
+          "about": {"@id": "https://linemini-reserve-app.vercel.app/#organization"},
+          "inLanguage": "ja"
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://linemini-reserve-app.vercel.app/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "厚木・本厚木エリアでオンライン予約できる飲食店は？",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "かながわスマイルマップでは、厚木市・本厚木駅周辺の飲食店（ラーメン・居酒屋・カフェ・和食など）をオンラインで予約できます。エリア絞り込みで「厚木」を選択するとすぐに一覧が表示されます。クーポンも多数掲載中です。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "小田原エリアの美容室・エステサロンを予約するには？",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "小田原駅周辺の美容室・エステサロン・ネイルサロンをかながわスマイルマップで一覧比較できます。コース選択→日時選択→確認の3ステップで簡単に予約できます。LINE限定クーポンも利用可能です。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "海老名・海老名駅周辺のラーメン店や居酒屋を探すには？",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "エリアフィルターで「海老名」を選択してご利用ください。ラーメン・居酒屋・カフェなど業種別に絞り込み検索が可能です。クーポン付き店舗も掲載しています。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "相模原・相模大野・橋本エリアの飲食店・美容室は？",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "相模原市（相模大野駅・橋本駅・相模原駅周辺）の飲食店・美容室をエリア選択で検索できます。エステサロン・ラーメン・居酒屋など多数のジャンルに対応しています。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "LINEクーポンとは何ですか？どうやって取得しますか？",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "LINE公式アカウントを友だち追加すると取得できる限定クーポンです。割引・特典が受けられます。店舗詳細ページの「LINE友だち追加はこちら」からLINE公式アカウントを友だち追加して取得できます。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "予約をキャンセルするには？",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "予約完了後に届くメールに記載のキャンセルリンクから、ログイン不要でいつでもキャンセルできます。当日キャンセルは予約時間の15分前まで可能です。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "スマートフォンのLINEアプリからも使えますか？",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "はい。かながわスマイルマップはLINEミニアプリとして動作します。LINE公式アカウントのトーク画面からアプリインストール不要でそのままご利用いただけます。"
+              }
+            }
+          ]
+        },
+        {
+          "@type": "BreadcrumbList",
+          "@id": "https://linemini-reserve-app.vercel.app/#breadcrumb",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "ホーム",
+              "item": "https://linemini-reserve-app.vercel.app/"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "店舗一覧",
+              "item": "https://linemini-reserve-app.vercel.app/app/list"
+            }
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

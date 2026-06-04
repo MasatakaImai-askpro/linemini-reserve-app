@@ -18,94 +18,21 @@ import CancelPage from "@/pages/cancel";
 import LoginPage from "@/pages/login";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import liff from '@line/liff';
-import VConsole from 'vconsole';
-
-// スマホ開発用コンソール
-if (process.env.NODE_ENV === 'development') {
-  const vConsole = new VConsole();
-}
+import { useEffect } from "react";
 
 // ─── ページラッパー（トップレベルで定義してReact Hooks順序を固定） ───
-function AppHome() {
-  return (
-    <LineAppFrame>
-      <HomePage />
-    </LineAppFrame>
-  );
-}
-function AppList() {
-  return (
-    <LineAppFrame>
-      <ListPage />
-    </LineAppFrame>
-  );
-}
-function AppDetail() {
-  return (
-    <LineAppFrame>
-      <DetailPage />
-    </LineAppFrame>
-  );
-}
-function AppReservation() {
-  return (
-    <LineAppFrame>
-      <ReservationPage />
-    </LineAppFrame>
-  );
-}
-function AppCancel() {
-  return (
-    <LineAppFrame>
-      <CancelPage />
-    </LineAppFrame>
-  );
-}
-function AppNotFound() {
-  return (
-    <LineAppFrame>
-      <NotFound />
-    </LineAppFrame>
-  );
-}
+function AppHome()        { return <LineAppFrame><HomePage /></LineAppFrame>; }
+function AppList()        { return <LineAppFrame><ListPage /></LineAppFrame>; }
+function AppDetail()      { return <LineAppFrame><DetailPage /></LineAppFrame>; }
+function AppReservation() { return <LineAppFrame><ReservationPage /></LineAppFrame>; }
+function AppCancel()      { return <LineAppFrame><CancelPage /></LineAppFrame>; }
+function AppNotFound()    { return <LineAppFrame><NotFound /></LineAppFrame>; }
 
-function WebHome() {
-  return (
-    <WebAppFrame>
-      <HomePage />
-    </WebAppFrame>
-  );
-}
-function WebList() {
-  return (
-    <WebAppFrame>
-      <ListPage />
-    </WebAppFrame>
-  );
-}
-function WebDetail() {
-  return (
-    <WebAppFrame>
-      <DetailPage />
-    </WebAppFrame>
-  );
-}
-function WebReservation() {
-  return (
-    <WebAppFrame>
-      <ReservationPage />
-    </WebAppFrame>
-  );
-}
-function WebCancel() {
-  return (
-    <WebAppFrame>
-      <CancelPage />
-    </WebAppFrame>
-  );
-}
+function WebHome()        { return <WebAppFrame><HomePage /></WebAppFrame>; }
+function WebList()        { return <WebAppFrame><ListPage /></WebAppFrame>; }
+function WebDetail()      { return <WebAppFrame><DetailPage /></WebAppFrame>; }
+function WebReservation() { return <WebAppFrame><ReservationPage /></WebAppFrame>; }
+function WebCancel()      { return <WebAppFrame><CancelPage /></WebAppFrame>; }
 
 // ─── 管理者ルート ───
 function AdminRoute() {

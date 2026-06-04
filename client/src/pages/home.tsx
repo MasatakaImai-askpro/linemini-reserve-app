@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useBasePath } from "@/hooks/use-base-path";
+import { useSEO, useJsonLd } from "@/lib/seo";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +36,6 @@ import type { Shop, Coupon } from "@shared/schema";
 import { getCategoryName, getAreaName, isRecentlyUpdated, sortByUpdatedAt } from "@/lib/data";
 import KanagawaMap from "@/components/kanagawa-map";
 import { useFavorites } from "@/hooks/use-favorites";
-import liff from '@line/liff';
 
 const categoryIcons: Record<string, any> = {
   gourmet: UtensilsCrossed,
@@ -48,31 +48,32 @@ const categoryIcons: Record<string, any> = {
 
 function HeroSection({ isWeb }: { isWeb?: boolean }) {
   return (
-    <div className={`relative w-full overflow-hidden ${isWeb ? "h-[260px]" : "h-[160px]"}`}>
+    <div className={`relative w-full overflow-hidden ${isWeb ? "h-[260px]" : "h-[180px]"}`}>
       <img
         src="/images/hero-kanagawa.png"
         alt="Kanagawa"
         className="absolute inset-0 w-full h-full object-cover"
         style={{ transform: "scaleX(-1)" }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/60" />
-      <div className="relative z-10 flex flex-col items-center justify-center h-full px-4 text-center">
-        <Badge
-          variant="secondary"
-          className="mb-2 bg-white/20 text-white border-white/30 backdrop-blur-sm text-[10px] px-2 py-0.5"
-          data-testid="badge-portal-label"
-        >
-          <MapPin className="w-2.5 h-2.5 mr-0.5" />
-          神奈川県全域・静岡県東部
-        </Badge>
+      <div className="absolute inset-0 bg-gradient-to-t from-amber-900/90 via-amber-800/60 via-[45%] to-transparent" />
+      <div className="relative z-10 flex flex-col justify-end h-full px-4 pb-10">
+        <div className="mb-1.5">
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/20 backdrop-blur-sm text-[10px] font-bold text-white border border-white/20"
+            data-testid="badge-portal-label"
+          >
+            <MapPin className="w-2.5 h-2.5" />
+            神奈川県全域・静岡県東部
+          </span>
+        </div>
         <h1
-          className={`font-bold text-white mb-1 tracking-tight ${isWeb ? "text-3xl" : "text-lg"}`}
+          className={`font-extrabold text-white tracking-tight leading-tight mb-1 drop-shadow-md ${isWeb ? "text-3xl" : "text-[22px]"}`}
           data-testid="text-hero-title"
         >
-          神奈川おでかけナビ
+          かながわスマイルマップ
         </h1>
         <p
-          className={`text-white/80 leading-relaxed ${isWeb ? "text-sm mt-1" : "text-[10px]"}`}
+          className={`text-white/90 font-medium ${isWeb ? "text-sm" : "text-[11px]"}`}
           data-testid="text-hero-description"
         >
           神奈川県・静岡県東部エリアのお店をまとめてご紹介
@@ -151,11 +152,7 @@ function SearchBar({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">すべてのエリア</SelectItem>
-            {AREAS.map((a) => (
-              <SelectItem key={a.slug} value={a.slug}>
-                {a.name}
-              </SelectItem>
-            ))}
+            {AREAS.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={category} onValueChange={setCategory}>
@@ -164,11 +161,7 @@ function SearchBar({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">すべての業種</SelectItem>
-            {CATEGORIES.map((c) => (
-              <SelectItem key={c.slug} value={c.slug}>
-                {c.name}
-              </SelectItem>
-            ))}
+            {CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <div className="flex flex-1 gap-2">
@@ -204,10 +197,9 @@ function AutoScrollRow({ shops, title, categoryId, icon, isWeb }: { shops: Shop[
     if (!container || shops.length <= 2) return;
     const animate = () => {
       if (!isPaused && container) {
-        const maxScroll = container.scrollWidth - container.clientWidth
-        if (container.scrollLeft < maxScroll -1) {
-          container.scrollLeft += scrollSpeedRef.current;
-        } else {
+        container.scrollLeft += scrollSpeedRef.current;
+        if (container.scrollLeft >= container.scrollWidth - container.clientWidth) {
+          container.scrollLeft = 0;
         }
       }
       animationRef.current = requestAnimationFrame(animate);
@@ -219,30 +211,7 @@ function AutoScrollRow({ shops, title, categoryId, icon, isWeb }: { shops: Shop[
   const scroll = (direction: "left" | "right") => {
     const container = scrollRef.current;
     if (!container) return;
-
-    const firstCard = container.querySelector(":first-child") as HTMLElement;
-    if(!firstCard) return;
-
-    const cardWidth = firstCard.getBoundingClientRect().width;
-    const gap = 10;
-    const scrollAmount = (cardWidth + gap) * 2;
-
-    const currentScroll = container.scrollLeft;
-    const maxScroll = container.scrollWidth - container.clientWidth;
-
-    // 右クリックで既に右端にいるなら何もしない
-    if (direction === "right" && currentScroll >= maxScroll - 5) return;
-    // 左クリックで既に左端にいるなら何もしない
-    if (direction === "left" && currentScroll <= 5) return;
-
-    setIsPaused(true);
-    container.scrollBy({
-      left: direction === "left" ? -scrollAmount : scrollAmount,
-      behavior: "smooth",
-    });
-    setTimeout(() => {
-      setIsPaused(false);
-    }, 500)
+    container.scrollBy({ left: direction === "left" ? -300 : 300, behavior: "smooth" });
   };
 
   const IconComponent = icon || categoryIcons[categoryId] || MapPinned;
@@ -429,13 +398,9 @@ function CouponUpdateSection({ coupons, shops, isWeb }: { coupons: Coupon[]; sho
     if (!container || coupons.length <= 2) return;
     const animate = () => {
       if (!isPaused && container) {
-        // 現在の端っこまでの余裕を計算
-        const maxScroll = container.scrollWidth - container.clientWidth;
-        
-        // 端に達していない時だけ進める
-        if (container.scrollLeft < maxScroll) {
-          container.scrollLeft += 0.5;
-        } else {
+        container.scrollLeft += 0.5;
+        if (container.scrollLeft >= container.scrollWidth - container.clientWidth) {
+          container.scrollLeft = 0;
         }
       }
       animationRef.current = requestAnimationFrame(animate);
@@ -447,120 +412,39 @@ function CouponUpdateSection({ coupons, shops, isWeb }: { coupons: Coupon[]; sho
   const scroll = (direction: "left" | "right") => {
     const container = scrollRef.current;
     if (!container) return;
-
-    const firstCard = container.querySelector(":first-child") as HTMLElement;
-    if (!firstCard) return;
-
-    const cardWidth = firstCard.getBoundingClientRect().width;
-    const gap = 10;
-
-    const scrollAmount = (cardWidth + gap) * 2;
-
-    const currentScroll = container.scrollLeft;
-    const maxScroll = container.scrollWidth - container.clientWidth;
-
-    if (direction === "right" && currentScroll >= maxScroll - 5) return;
-    if (direction === "left" && currentScroll <= 5) return;
-
-    setIsPaused(true)
-    container.scrollBy({
-      left: direction === "left" ? -scrollAmount : scrollAmount,
-      behavior: "smooth",
-    });
-
-    setTimeout(() => {
-      setIsPaused(false);
-    }, 500)
+    container.scrollBy({ left: direction === "left" ? -300 : 300, behavior: "smooth" });
   };
 
-  const latestCouponsMap = new Map();
-  const hasOtherCouponsMap = new Map();
-
-  const sortedCoupons = [...coupons].sort((a, b) =>
-    new Date (b.createdAt).getTime() - new Date (a.createdAt).getTime()
-  );
-
-  sortedCoupons.forEach((coupon) => {
-    if(!hasOtherCouponsMap.has(coupon.shopId)) {
-      latestCouponsMap.set(coupon.shopId, coupon);
-      hasOtherCouponsMap.set(coupon.shopId, false);
-    } else {
-      hasOtherCouponsMap.set(coupon.shopId, true)
-    }
-  });
-
-  const displayCoupons = Array.from(latestCouponsMap.values());
-
-  const CouponCard = ({ 
-    coupon, 
-    hasOthers 
-  }: { 
-    coupon: any; 
-    hasOthers?: boolean 
-  }) => {
+  const CouponCard = ({ coupon }: { coupon: typeof coupons[0] }) => {
     const shop = shops.find((s) => s.id === coupon.shopId);
     if (!shop) return null;
-
     return (
       <Card
-        className={`flex-shrink-0 overflow-visible cursor-pointer hover-elevate active-elevate-2 transition-transform ${
-          isWeb ? "w-full" : "w-[160px]"
-        }`}
+        className={`overflow-visible cursor-pointer hover-elevate active-elevate-2 transition-transform ${isWeb ? "w-full" : "flex-shrink-0 w-[160px]"}`}
         onClick={() => navigate(`${basePath}/shop/${shop.id}`)}
         data-testid={`card-coupon-update-${coupon.id}`}
       >
         <div className="relative">
-          <img
-            src={shop.imageUrl}
-            alt={shop.name}
-            className={`w-full object-cover rounded-t-md ${isWeb ? "h-[110px]" : "h-[80px]"}`}
-            loading="lazy"
-          />
+          <img src={shop.imageUrl} alt={shop.name} className={`w-full object-cover rounded-t-md ${isWeb ? "h-[110px]" : "h-[80px]"}`} loading="lazy" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-t-md" />
           <div className="absolute bottom-1 left-2 right-2">
             <p className="text-white text-[10px] font-bold line-clamp-1">{shop.name}</p>
           </div>
-          
-          {/* クーポンバッジ */}
           <Badge className="absolute top-1 right-1 bg-[#06C755] border-[#06C755] text-white text-[8px] px-1 py-0 gap-0.5">
-            <Ticket className="w-2 h-2" /> クーポン
+            <Ticket className="w-2 h-2" />クーポン
           </Badge>
-
-          {/* その他クーポンありバッジ (アプリ版の横スクロール時などに表示) */}
-          {hasOthers && (
-          <Badge 
-              variant="outline" 
-              className={`
-                absolute text-[8px] px-1 py-0 border-zinc-300 text-zinc-700 bg-zinc-100 shadow-sm
-                ${isWeb 
-                  ? "-top-28 left-24"
-                  : "-top-20 left-12"
-                }
-              `}
-            >
-              その他あり
-            </Badge>
-          )}
         </div>
-
         <div className="p-2">
-          <div className="flex flex-wrap items-center gap-1 mb-1">
-            {coupon.isLineAccountCoupon && (
-              <Badge className="bg-[#06C755] border-[#06C755] text-white text-[9px] px-1 py-0">LINE限定</Badge>
-            )}
-            <Badge variant="secondary" className="text-[9px] px-1 py-0 font-bold text-[#06C755]">
-              {coupon.discount}
-            </Badge>
+          <div className="flex items-center gap-1 mb-0.5">
+            {coupon.isLineAccountCoupon && <Badge className="bg-[#06C755] border-[#06C755] text-white text-[9px] px-1 py-0">LINE限定</Badge>}
+            {coupon.discount && <Badge variant="secondary" className="text-[9px] px-1 py-0 font-bold text-[#06C755]">{coupon.discount}</Badge>}
           </div>
-          <h3 className="font-bold text-xs line-clamp-1">{coupon.title}</h3>
-          {coupon.description && (
-            <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{coupon.description}</p>
-          )}
+          <h3 className="font-bold text-xs line-clamp-1" data-testid={`text-coupon-title-${coupon.id}`}>{coupon.title}</h3>
+          {coupon.description && <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{coupon.description}</p>}
         </div>
       </Card>
     );
   };
-
 
   return (
     <section className="mb-4" data-testid="section-coupon-updates">
@@ -591,30 +475,21 @@ function CouponUpdateSection({ coupons, shops, isWeb }: { coupons: Coupon[]; sho
 
       {isWeb ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {displayCoupons.slice(0, 10).map((coupon) => (
-            <CouponCard 
-              key={coupon.id} 
-              coupon={coupon} 
-              hasOthers={hasOtherCouponsMap.get(coupon.shopId)} 
-            />
-          ))}
+          {coupons.slice(0, 10).map((coupon) => <CouponCard key={coupon.id} coupon={coupon} />)}
         </div>
       ) : (
         <div
           ref={scrollRef}
           className="flex gap-2.5 overflow-x-auto scrollbar-hide px-3 pb-1"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
+          onTouchStart={() => setIsPaused(true)}
+          onTouchEnd={() => setIsPaused(false)}
         >
-          {displayCoupons.map((coupon) => (
-            <CouponCard 
-              key={coupon.id} 
-              coupon={coupon} 
-              hasOthers={hasOtherCouponsMap.get(coupon.shopId)} 
-            />
-          ))}
+          {coupons.map((coupon) => <CouponCard key={coupon.id} coupon={coupon} />)}
         </div>
       )}
-
     </section>
   );
 }
@@ -640,6 +515,26 @@ export default function HomePage() {
   const [, navigate] = useLocation();
   const basePath = useBasePath();
   const isWeb = basePath === "/web";
+
+  useSEO({
+    title: "神奈川の飲食店・美容室 予約＆クーポン | 厚木・小田原・海老名・相模原",
+    description: "かながわスマイルマップ — 厚木・小田原・海老名・相模原の飲食店・美容室・エステサロン・ラーメン・居酒屋をオンライン予約。LINE限定クーポン配信中。本厚木・相模大野・橋本・海老名駅対応。",
+    keywords: "厚木 飲食店,小田原 美容室,海老名 ラーメン,相模原 居酒屋,本厚木 エステ,神奈川 予約,神奈川 クーポン,相模大野,橋本,海老名駅,小田原駅",
+    canonical: "/app",
+  });
+
+  useJsonLd("home-jsonld", {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": "かながわスマイルマップ 掲載エリア",
+    "description": "神奈川県（厚木・小田原・海老名・相模原）の飲食店・美容室・エステサロンの予約・クーポンポータル",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "厚木・本厚木エリアの飲食店・美容室", "url": "https://linemini-reserve-app.vercel.app/app/list?area=atsugi" },
+      { "@type": "ListItem", "position": 2, "name": "小田原エリアの飲食店・美容室", "url": "https://linemini-reserve-app.vercel.app/app/list?area=odawara" },
+      { "@type": "ListItem", "position": 3, "name": "海老名エリアの飲食店・美容室", "url": "https://linemini-reserve-app.vercel.app/app/list?area=ebina" },
+      { "@type": "ListItem", "position": 4, "name": "相模原・相模大野・橋本エリアの飲食店・美容室", "url": "https://linemini-reserve-app.vercel.app/app/list?area=sagamihara" },
+    ]
+  });
   const { data: shops = [], isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
   });
@@ -647,30 +542,6 @@ export default function HomePage() {
   const { data: allCoupons = [] } = useQuery<Coupon[]>({
     queryKey: ["/api/coupons"],
   });
-
-  // LINEID取得のロジック
-  // ※必要に応じてコメントアウト解除してください（ローカル環境だとうまく動かない為）
-
-  // localStorage.removeItem("liff_profile");
-  // if (!isWeb) {
-    
-  //   useEffect(() => {
-  //       const initLiff = async () => {
-  //         try {
-  //           await liff.init({ liffId: "2009341857-tmEtN0SB" });
-  //           if (!liff.isLoggedIn()) {
-  //             liff.login();
-  //           } else {
-  //             const userProfile = await liff.getProfile();
-  //             localStorage.setItem("liff_profile", JSON.stringify(userProfile));
-  //           }
-  //         } catch (err) {
-  //           console.error("LIFF失敗", err);
-  //         }
-  //       };
-  //       initLiff();
-  //     }, []);
-  // }
 
   const handleSearch = (area: string, category: string, keyword: string) => {
     const params = new URLSearchParams();
@@ -749,13 +620,13 @@ export default function HomePage() {
         ) : (
           <>
             {CATEGORIES.map((cat) => {
-              const catShops = groupedShops[cat.slug] || [];
+              const catShops = groupedShops[cat.id] || [];
               return (
                 <AutoScrollRow
-                  key={cat.slug}
+                  key={cat.id}
                   shops={catShops}
                   title={cat.name}
-                  categoryId={cat.slug}
+                  categoryId={cat.id}
                   isWeb={isWeb}
                 />
               );
@@ -768,7 +639,7 @@ export default function HomePage() {
         <footer className="bg-card border-t py-4 px-3">
           <div className="text-center">
             <p className="font-bold text-primary text-xs mb-1" data-testid="text-footer-title">
-              神奈川おでかけナビ
+              かながわスマイルマップ
             </p>
             <p className="text-[10px] text-muted-foreground mb-2">
               神奈川県全域・静岡県東部エリアの商店街・組合加盟店のポータルサイト
@@ -783,7 +654,7 @@ export default function HomePage() {
               ))}
             </div>
             <p className="text-[10px] text-muted-foreground mt-3">
-              &copy; 2026 神奈川おでかけナビ
+              &copy; 2026 かながわスマイルマップ
             </p>
           </div>
         </footer>

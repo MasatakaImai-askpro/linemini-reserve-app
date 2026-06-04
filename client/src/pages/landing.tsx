@@ -13,7 +13,7 @@ export default function LandingPage() {
             <span className="text-3xl text-white font-bold">西</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2" data-testid="text-landing-title">
-            神奈川おでかけナビ
+            かながわスマイルマップ
           </h1>
           <p className="text-sm text-muted-foreground">デモ環境</p>
         </div>
@@ -83,7 +83,7 @@ export default function LandingPage() {
 
       <div className="px-6 pb-8 pt-4 text-center">
         <p className="text-xs text-muted-foreground">
-          &copy; 2026 神奈川おでかけナビ
+          &copy; 2026 かながわスマイルマップ
         </p>
       </div>
     </div>

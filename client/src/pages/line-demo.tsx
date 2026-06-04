@@ -63,7 +63,7 @@ function PinnedNote({ onOpen }: { onOpen: () => void }) {
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-[#06C755] font-bold">ノート</span>
         </div>
-        <p className="text-xs font-bold text-gray-800 truncate">神奈川おでかけナビを開く</p>
+        <p className="text-xs font-bold text-gray-800 truncate">かながわスマイルマップを開く</p>
         <p className="text-[10px] text-gray-500 truncate">お店検索・クーポン・予約はこちら</p>
       </div>
       <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
@@ -96,7 +96,7 @@ export default function LineDemoPage() {
             <ChevronLeft className="w-5 h-5 text-white" />
           </button>
           <div className="flex flex-col items-center">
-            <span className="text-xs font-bold text-white">神奈川おでかけナビ</span>
+            <span className="text-xs font-bold text-white">かながわスマイルマップ</span>
             <span className="text-[9px] text-white/70">公式アカウント</span>
           </div>
           <div className="flex items-center gap-1">
@@ -117,13 +117,13 @@ export default function LineDemoPage() {
           </div>
 
           <ChatBubble
-            text={"友だち追加ありがとうございます！🎉\n\n神奈川おでかけナビの公式アカウントです。"}
+            text={"友だち追加ありがとうございます！🎉\n\nかながわスマイルマップの公式アカウントです。"}
             time="10:00"
             delay={300}
           />
 
           <ChatBubble
-            text={"大和・小田原周辺のお得な情報やクーポンをお届けします✨\n\nトーク上部の固定リンクからいつでもおでかけナビを開けます！"}
+            text={"神奈川のお得な情報やクーポンをお届けします✨\n\nトーク上部の固定リンクからいつでもスマイルマップを開けます！"}
             time="10:00"
             delay={800}
           />

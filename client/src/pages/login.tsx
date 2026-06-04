@@ -23,7 +23,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
             <MapPin className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">かながわおでかけナビ</h1>
+          <h1 className="text-2xl font-bold text-foreground">かながわスマイルマップ</h1>
           <p className="text-sm text-muted-foreground mt-1">管理ポータル</p>
         </div>
 
@@ -38,9 +38,8 @@ export default function LoginPage() {
                 <Input
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="例: admin"
+                  placeholder="username"
                   className="pl-9"
-                  name="username"
                   autoComplete="username"
                   data-testid="input-username"
                   disabled={login.isPending}
@@ -60,7 +59,6 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   className="pl-9"
-                  name="password"
                   autoComplete="current-password"
                   data-testid="input-password"
                   disabled={login.isPending}
