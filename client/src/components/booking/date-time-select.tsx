@@ -64,7 +64,7 @@ export function DateTimeSelect({ shopId, course, staff, onSelect }: DateTimeSele
     }).finally(() => {
       setLoadingSlots(false);
     });
-  }, [selectedDate, staff, shopId]);
+  }, [selectedDate, staff, shopId, course.id]);
 
   const handleDateClick = (date: Date) => {
     if (isBefore(date, today) || !isSameMonth(date, currentMonth) || date > maxDate) return;

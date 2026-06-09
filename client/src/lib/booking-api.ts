@@ -77,12 +77,8 @@ export interface StoreSettings {
   store_open_time?: string;
   store_close_time?: string;
   shop_category: string; 
-  // shop_info_name?: string;
-  // shop_info_description?:string;
-  // shop_info_address?: string;
-  // shop_info_phone?: string;
-  // shop_info_hours?: string;
-  // shop_info_closed_days?: string;
+  closed_dow?: string;
+  closed_newyear?: string | boolean;
 }
 
 export const SHOP_STAFF_ID = "__shop__";

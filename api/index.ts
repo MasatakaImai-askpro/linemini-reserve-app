@@ -380,7 +380,7 @@ async function sendLineFlexMessage(lineId: string, lineMessageData: any, token: 
               },
               {
                 type: "text",
-                text: "© 2026 神奈川おでかけナビ All Rights Reserved.",
+                text: "© 2026 かながわスマイルマップ All Rights Reserved.",
                 size: "xs",
                 color: "#c0c0c0",
                 align: "center",
@@ -560,7 +560,7 @@ async function sendLineFlexMessage(lineId: string, lineMessageData: any, token: 
               },
               {
                 type: "text",
-                text: "© 2026 神奈川おでかけナビ All Rights Reserved.",
+                text: "© 2026 かながわスマイルマップ All Rights Reserved.",
                 size: "xs",
                 color: "#c0c0c0",
                 align: "center",
@@ -759,18 +759,75 @@ export function ensureSetup(): Promise<void> {
           res.status(500).json({ message: "Failed to fetch shop" });
         }
       });
+
       app.post("/api/shops", async (req, res) => {
         try {
-          const b = req.body; const slug = b.slug || crypto.randomUUID().replace(/-/g, "").slice(0, 10);
-          await sql`INSERT INTO shops (slug, name, description, area_id, area, category, subcategory, address, phone, hours, closed_days, website, display_order, line_account_url, image_url, gallery_image_urls, is_active, enable_staff_assignment, reservation_url, reservation_image_url, like_count) VALUES (${slug}, ${b.name||""}, ${b.description||""}, ${b.areaId||1}, ${b.area||""}, ${b.category||""}, ${b.subcategory||null}, ${b.address||""}, ${b.phone||null}, ${b.hours||null}, ${b.closedDays||null}, ${b.website||null}, ${b.displayOrder||0}, ${b.lineAccountUrl||null}, ${b.imageUrl||""}, ${b.galleryImageUrls||[]}, ${b.isActive!==false}, ${b.enableStaffAssignment||false}, ${b.reservationUrl||null}, ${b.reservationImageUrl||null}, ${b.likeCount||0})`;
-          const rows = await sql`SELECT * FROM shops WHERE slug = ${slug}`;
-          if (!rows[0]) return res.status(500).json({ message: "Failed to create shop" });
+          const b = req.body;
+          const slug = b.slug || crypto.randomUUID().replace(/-/g, "").slice(0, 10);
 
-          // await sql`UPDATE shops SET reservation_url = CONCAT('/reservation/', id::text) WHERE id = ${rows[0].id} AND reservation_url IS NULL`;
-          const updatedRows = await sql`SELECT * FROM shops WHERE id = ${rows[0].id}`;
+          //トランザクション開始
+          await sql`BEGIN`;
+
+          //shops テーブルにインサート
+          await sql`
+            INSERT INTO shops (
+              slug, name, description, area_id, area, category, subcategory, 
+              address, phone, hours, closed_days, website, display_order, 
+              line_account_url, image_url, gallery_image_urls, is_active, 
+              enable_staff_assignment, reservation_url, reservation_image_url, like_count
+            ) VALUES (
+              ${slug}, ${b.name || ""}, ${b.description || ""}, ${b.areaId || 1}, ${b.area || ""}, 
+              ${b.category || ""}, ${b.subcategory || null}, ${b.address || ""}, ${b.phone || null}, 
+              ${b.hours || null}, ${b.closedDays || null}, ${b.website || null}, ${b.displayOrder || 0}, 
+              ${b.lineAccountUrl || null}, ${b.imageUrl || ""}, ${b.galleryImageUrls || []}, 
+              ${b.isActive !== false}, ${b.enableStaffAssignment || false}, ${b.reservationUrl || null}, 
+              ${b.reservationImageUrl || null}, ${b.likeCount || 0}
+            )
+          `;
+
+          // 自動採番された id を含む店舗レコードを取得
+          const rows = await sql`SELECT * FROM shops WHERE slug = ${slug}`;
+          if (!rows[0]) {
+            throw new Error("Failed to create shop record");
+          }
+          const newShop = rows[0];
+
+          // booking_settings へのインサート
+          await sql`
+            INSERT INTO booking_settings (
+              shop_id,
+              store_name,
+              store_description,
+              store_address,
+              store_phone,
+              staff_selection_enabled
+            ) VALUES (
+              ${newShop.id},
+              ${newShop.name || ""},
+              ${newShop.description || ""},
+              ${newShop.address || ""},
+              ${newShop.phone || ""},
+              false
+            )
+            ON CONFLICT (shop_id) DO NOTHING
+          `;
+
+          // すべて成功したらコミット
+          await sql`COMMIT`;
+
+          // 最新の店舗情報を取得して返却
+          const updatedRows = await sql`SELECT * FROM shops WHERE id = ${newShop.id}`;
           res.status(201).json(toShop(updatedRows[0]));
-        } catch (e: any) { console.error("shop create error:", e); res.status(500).json({ message: "Failed to create shop" }); }
+
+        } catch (e: any) {
+          // どこか一箇所でもエラーが起きたら、ここへ飛んでロールバック
+          await sql`ROLLBACK`.catch((err) => console.error("Rollback failed:", err));
+          
+          console.error("shop create transaction error:", e);
+          res.status(500).json({ message: "Failed to create shop and settings" });
+        }
       });
+
       app.put("/api/shops/:id", async (req, res) => {
         try {
           const id = parseInt(req.params.id);
@@ -1138,124 +1195,147 @@ export function ensureSetup(): Promise<void> {
       });
 
       // ─── スロット ───
+      const slotTimeToMin = (t: string) => {
+        const [h, m] = t.split(":").map(Number);
+        return h * 60 + m;
+      };
       app.get("/api/shops/:shopId/slots", async (req, res) => {
         const shopId = parseInt(req.params.shopId);
         if (isNaN(shopId))
           return res.status(400).json({ message: "Invalid shop ID" });
+
         try {
           const date = req.query.date as string;
           const courseId = req.query.courseId as string | undefined;
-          const staffId = req.query.staffId as string | undefined;
+          const staffId = (req.query.staffId as string) || '__shop__';
 
-          console.log("slots request - shopId:", shopId, "date:", date, "courseId:", courseId);
+          // 1. 基本設定（営業時間・定休日など）を取得
+          const stRows = await safeQuery(
+            () =>
+              sql`SELECT store_open_time, store_close_time, closed_dow, closed_newyear, table_count FROM booking_settings WHERE shop_id=${shopId}`,
+          );
+          const st = stRows[0];
           
-          // Validate date format
-          if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            return res.status(400).json({ message: "Invalid date format. Expected YYYY-MM-DD" });
-          }
-          
-          let openHour = 10; let closeHour = 19;
-          const settingsCnt = await sql`SELECT COUNT(*) as cnt FROM booking_settings WHERE shop_id=${shopId}`;
-          if (parseInt(settingsCnt[0]?.cnt || "0") > 0) { const sr = await sql`SELECT store_open_time, store_close_time FROM booking_settings WHERE shop_id=${shopId}`; if (sr[0]) { const ot = sr[0].store_open_time; const ct = sr[0].store_close_time; openHour = typeof ot === "string" ? parseInt(ot.split(":")[0], 10) : (typeof ot === "number" ? ot : 10); closeHour = typeof ct === "string" ? parseInt(ct.split(":")[0], 10) : (typeof ct === "number" ? ct : 19); } }
+          // 2. 営業時間からベースとなる「すべての30分枠」をプログラム側で生成
+          const openMin = slotTimeToMin(st?.store_open_time || "10:00");
+          const closeMin = slotTimeToMin(st?.store_close_time || "19:00");
           const allSlots: string[] = [];
-          for (let h = openHour; h < closeHour; h++) { allSlots.push(`${String(h).padStart(2,"0")}:00`); if (h < closeHour - 1 || closeHour - h > 1) allSlots.push(`${String(h).padStart(2,"0")}:30`); }
-          // console.log("allSlots:", allSlots);
-          
-          if(!date && staffId) {
-            const slots = await sql`
-            SELECT day_of_week, time, available
-            FROM booking_slots
-            WHERE shop_id = ${shopId}
-            AND staff_id = ${staffId}
-            `;
-            return res.json(slots);
+          for (let m = openMin; m < closeMin; m += 30) {
+            allSlots.push(
+              `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`
+            );
           }
-          if (!date) return res.json(allSlots.map(t => ({ time: t, available: true })));
-          
-          let tableCount = 1;
-          const tableCountRow = await sql`SELECT table_count FROM booking_settings WHERE shop_id=${shopId}`; 
-          if (tableCountRow.length > 0) { tableCount = Math.max(parseInt(tableCountRow[0]?.table_count || "1",10)||1,1); }
-          
+          if (!date) {
+            const rows = await safeQuery(
+              () => sql`
+                SELECT day_of_week, time, available
+                FROM booking_slots
+                WHERE shop_id = ${shopId}
+                  AND staff_id = ${staffId}
+              `
+            );
+
+            return res.json(rows);
+          }
+
+          // 日付から曜日（0〜6）を算出
+          const [dy, dm, dd] = date.split("-").map(Number);
+          const dow = new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay();
+
+          // 定休日・年末年始チェック
+          const closedDow = (st?.closed_dow || "").split(",").filter(Boolean).map(Number);
+          const closedNY = st?.closed_newyear === true;
+          if (closedDow.includes(dow)) {
+            return res.json(allSlots.map((t) => ({ time: t, available: false })));
+          }
+          if (closedNY && ((dm === 12 && dd >= 29) || (dm === 1 && dd <= 3))) {
+            return res.json(allSlots.map((t) => ({ time: t, available: false })));
+          }
+
+          // 3. booking_slots から「この曜日に明示的に非表示(false)にされた枠」を取得する
+          const disabledSlotsRows = await safeQuery(
+            () =>
+              sql`SELECT time FROM booking_slots 
+                  WHERE shop_id = ${shopId} 
+                    AND staff_id = ${staffId} 
+                    AND day_of_week = ${dow} 
+                    AND available = false`,
+          );
+          // 非表示枠のSetを作る
+          const dowForcedClosed = new Set(disabledSlotsRows.map((r: any) => r.time as string));
+
+          // 4. コースの所要時間を算出
           let courseDuration = 30;
-          if (courseId) { 
-            try {
-              const cc = await sql`SELECT COUNT(*) as cnt FROM booking_courses WHERE id=${parseInt(courseId, 10)} AND shop_id=${shopId}`;
-              if (parseInt(cc[0]?.cnt||"0")>0) { 
-                const cr = await sql`SELECT duration FROM booking_courses WHERE id=${parseInt(courseId, 10)} AND shop_id=${shopId}`;
-                if (cr[0]) courseDuration = parseInt(cr[0].duration,10)||30;
+          if (courseId) {
+            const parsedCourseId = parseInt(courseId, 10);
+            if (!isNaN(parsedCourseId)) {
+              const cc = await sql`SELECT COUNT(*) as cnt FROM booking_courses WHERE id=${parsedCourseId} AND shop_id=${shopId}`;
+              if (parseInt(cc[0]?.cnt || "0") > 0) {
+                const cr = await sql`SELECT duration FROM booking_courses WHERE id=${parsedCourseId} AND shop_id=${shopId}`;
+                if (cr[0]) courseDuration = parseInt(cr[0].duration, 10) || 30;
               }
-            } catch (ce) {
-              console.warn("Course lookup failed:", ce);
             }
           }
-          
           const slotsNeeded = Math.ceil(courseDuration / 30);
-          
-          let reservations: any[] = [];
-          try {
-            reservations = await safeQuery(() => sql`SELECT r.time, COALESCE(c.duration,30) AS duration FROM booking_reservations r LEFT JOIN booking_courses c ON r.course_id::integer = c.id AND c.shop_id = r.shop_id WHERE r.shop_id=${shopId} AND r.date=${date} AND r.status != 'cancelled'`);
-            console.log("reservations fetched:", reservations.length, "items");
-          } catch (rte) {
-            console.error("Reservations query error:", rte);
-            throw rte;
+
+          // 5. 既存の予約一覧を取得し、重複埋まりを計算
+          let tableCount = st?.table_count ? Math.max(parseInt(String(st.table_count), 10) || 1, 1) : 1;
+          const reservations = await safeQuery(
+            () =>
+              sql`SELECT r.time, COALESCE(c.duration,30) AS duration 
+                  FROM booking_reservations r 
+                  LEFT JOIN booking_courses c ON c.id::text = r.course_id AND c.shop_id = r.shop_id 
+                  WHERE r.shop_id=${shopId} AND r.date=${date} AND r.status != 'cancelled'`,
+          );
+
+          const slotCount = new Map<string, number>();
+          for (const r of reservations) {
+            const [rh, rm] = (r.time as string).split(":").map(Number);
+            const rStart = rh * 60 + rm;
+            const rEnd = rStart + (parseInt(r.duration, 10) || 30);
+            for (const slot of allSlots) {
+              const [sh, sm] = slot.split(":").map(Number);
+              const sStart = sh * 60 + sm;
+              if (rStart < sStart + 30 && rEnd > sStart)
+                slotCount.set(slot, (slotCount.get(slot) || 0) + 1);
+            }
           }
-          
-          const slotCount = new Map<string,number>();
-          for (const r of reservations) { 
-            if (!r.time) continue;
-            try {
-              const [rh,rm]=(r.time as string).split(":").map(Number);
-              const rStart=rh*60+rm;
-              const durationVal = typeof r.duration === 'number' ? r.duration : parseInt(r.duration,10)||30;
-              const rEnd=rStart+durationVal;
-              for (const slot of allSlots) {
-                const [sh,sm]=slot.split(":").map(Number);
-                const sStart=sh*60+sm;
-                if (rStart<sStart+30&&rEnd>sStart) slotCount.set(slot,(slotCount.get(slot)||0)+1);
+          const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000);
+          const todayJST = nowJST.toISOString().slice(0, 10);
+          const nowMinutes = nowJST.getUTCHours() * 60 + nowJST.getUTCMinutes();
+
+          // 6. 生成した全枠（allSlots）に対して、各種非表示・満席フィルターをかける
+          res.json(
+            allSlots.map((slot) => {
+              const [sh, sm] = slot.split(":").map(Number);
+              const sStart = sh * 60 + sm;
+
+              // ① 曜日単位での管理画面側OFF設定があれば、available: false にする
+              // ★修正: フロントがリロード時にキーを復元できるよう、算出済みの dow (曜日数値) を含める
+              if (dowForcedClosed.has(slot))
+                return { day_of_week: dow, time: slot, available: false };
+
+              // ② 当日かつ15分前を過ぎている場合は選択不可
+              if (date === todayJST && nowMinutes >= sStart - 15)
+                return { day_of_week: dow, time: slot, available: false };
+
+              // ③ コース長さに応じた予約重複（満席）チェック
+              let max = 0;
+              for (let i = 0; i < slotsNeeded; i++) {
+                const cm = sStart + i * 30;
+                const cs = `${String(Math.floor(cm / 60)).padStart(2, "0")}:${String(cm % 60).padStart(2, "0")}`;
+                max = Math.max(max, slotCount.get(cs) || 0);
               }
-            } catch (pe) {
-              console.warn("Error processing reservation:", r, pe);
-            }
-          }
-
-          let unvaiavleTimes = new Set<string>();
-          if (staffId && staffId !== "__shop__" && date) {
-            const dayOfWeek = new Date(date).getDay();
-            const unvaliavle = await sql`
-            Select time from booking_slots
-            WHERE shop_id = ${shopId}
-            AND staff_id = ${staffId}
-            AND day_of_week = ${dayOfWeek}
-            AND available = false
-            `;
-            unvaiavleTimes = new Set(unvaliavle.map((u: any) => u.time));
-          }
-
-          const nowJst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-            const todayStr = `${nowJst.getFullYear()}-${String(nowJst.getMonth()+1).padStart(2,"0")}-${String(nowJst.getDate()).padStart(2,"0")}`;
-            const isToday = date === todayStr;
-            const nowMinutes = isToday ? nowJst.getHours()*60 + nowJst.getMinutes() + 15 : 0;
-                      const result = allSlots.map(slot => { 
-            const [sh,sm]=slot.split(":").map(Number);
-            const sStart=sh*60+sm;
-            if (isToday && sStart <= nowMinutes) return {time:slot,available:false};
-            if (sStart+courseDuration>closeHour*60) return {time:slot,available:false};
-            if (unvaiavleTimes.has(slot)) return {time:slot,available:false};
-            let max=0;
-            for(let i=0;i<slotsNeeded;i++){
-              const cm=sStart+i*30;
-              const cs=`${String(Math.floor(cm/60)).padStart(2,"0")}:${String(cm%60).padStart(2,"0")}`;
-              max=Math.max(max,slotCount.get(cs)||0);
-            }
-            return {time:slot,available:max<tableCount};
-          });
-          console.log("returning slots result:", result);
-          res.json(result);
-        } catch (e: any) { 
-          console.error("slots error:", e.message, e); 
-          res.status(500).json({ message: "Failed to fetch slots", error: e.message }); 
+              
+              return { day_of_week: dow, time: slot, available: max < tableCount };
+            }),
+          );
+        } catch (e: any) {
+          console.error("slots error:", e);
+          res.status(500).json({ message: "Failed to fetch slots" });
         }
       });
+
       app.put("/api/shops/:shopId/slots", async (req, res) => {
         const shopId = parseInt(req.params.shopId); if (isNaN(shopId)) return res.status(400).json({ message: "Invalid shop ID" });
         try {
@@ -1278,84 +1358,49 @@ export function ensureSetup(): Promise<void> {
       });
 
       // ─── 設定 ───
-      app.get("/api/shops/:shopId/settings", async (req, res) => {
-        const shopId = parseInt(req.params.shopId);
-        if (isNaN(shopId))
-          return res.status(400).json({ message: "Invalid shop ID" });
-        try {
-          // 標準コースをインサートする（利用意図が不明なためコメントアウトで対応）
-          // await seedShopIfEmpty(shopId);
-          const cnt =
-            await sql`SELECT COUNT(*) as cnt FROM booking_settings WHERE shop_id=${shopId}`;
-          if (parseInt(cnt[0]?.cnt || "0") > 0) {
-            const rows =
-              // await sql`SELECT bs.*, s.name as shop_name, s.description as shop_description, s.address as shop_address, s.phone as shop_phone, s.hours as shop_hours, s.closed_days as shop_closed_days FROM booking_settings bs JOIN shops s ON s.id = bs.shop_id WHERE bs.shop_id=${shopId}`;
-              // await sql`SELECT * FROM booking_settings WHERE shop_id=${shopId}`;
-              await sql`SELECT bs.*, s.category FROM booking_settings as bs LEFT JOIN shops as s ON s.id = bs.shop_id WHERE bs.shop_id=${shopId}`
-            const s = rows[0];
-            return res.json({
-              store_name: s.store_name || "",
-              store_description: s.store_description || "",
-              store_address: s.store_address || "",
-              store_phone: s.store_phone || "",
-              store_email: s.store_email || "",
-              store_hours: s.store_hours || "",
-              store_open_time: s.store_open_time || "10:00",
-              store_close_time: s.store_close_time || "19:00",
-              store_closed_days: s.store_closed_days || "",
-              banner_url: s.banner_url || "",
-              staff_selection_enabled: s.staff_selection_enabled || false,
-              table_count: s.table_count != null ? String(s.table_count) : "0",
-              max_party_size:
-                s.max_party_size != null ? String(s.max_party_size) : "0",
-              shop_category: s.category
-              // shop_info_name: s.shop_name || "",
-              // shop_info_description: s.shop_description || "",
-              // shop_info_address: s.shop_address || "",
-              // shop_info_phone: s.shop_phone || "",
-              // shop_info_hours: s.shop_hours || "",
-              // shop_info_closed_days: s.shop_closed_days || ""
-            });
-          }
-          const shopRows = await sql`SELECT * FROM shops WHERE id=${shopId}`;
-          if (!shopRows[0])
-            return res.status(404).json({ message: "Shop not found" });
-          const s = shopRows[0];
-          res.json({
-            store_name: s.name || "",
-            store_description: s.description || "",
-            store_address: s.address || "",
-            store_phone: s.phone || "",
-            store_email: "",
-            store_hours: s.hours || "",
-            store_open_time: s.store_open_time || "10:00",
-            store_close_time: s.store_close_time || "19:00",
-            store_closed_days: s.store_closed_days || "",
-            banner_url: s.image_url || "",
-            staff_selection_enabled: s.enable_staff_assignment
-              ? true
-              : false,
-          });
-        } catch (e: any) {
-          console.error("settings error:", e);
-          res.status(500).json({ message: "Failed to fetch settings" });
-        }
-      });
+    app.get("/api/shops/:shopId/settings", async (req, res) => {
+      const shopId = parseInt(req.params.shopId);
+      if (isNaN(shopId))
+        return res.status(400).json({ message: "Invalid shop ID" });
 
-      // app.put("/api/shops/:shopId/settings", async (req, res) => {
-      //   const shopId = parseInt(req.params.shopId);
-      //   if (isNaN(shopId))
-      //     return res.status(400).json({ message: "Invalid shop ID" });
-      //   try {
-      //     const s = req.body;
-      //     const tc = parseInt(s.table_count || "0", 10) || 0;
-      //     const mp = parseInt(s.max_party_size || "0", 10) || 0;
-      //     await sql`INSERT INTO booking_settings (shop_id,store_name,store_description,store_address,store_phone,store_email,store_hours,store_closed_days,banner_url,staff_selection_enabled,table_count,max_party_size,updated_at) VALUES (${shopId},${s.store_name || ""},${s.store_description || ""},${s.store_address || ""},${s.store_phone || ""},${s.store_email || ""},${s.store_hours || ""},${s.store_closed_days || ""},${s.banner_url || ""},${s.staff_selection_enabled || "false"},${tc},${mp},NOW()) ON CONFLICT (shop_id) DO UPDATE SET store_name=${s.store_name || ""},store_description=${s.store_description || ""},store_address=${s.store_address || ""},store_phone=${s.store_phone || ""},store_email=${s.store_email || ""},store_hours=${s.store_hours || ""},store_closed_days=${s.store_closed_days || ""},banner_url=${s.banner_url || ""},staff_selection_enabled=${s.staff_selection_enabled || "false"},table_count=${tc},max_party_size=${mp},updated_at=NOW()`;
-      //     res.json(s);
-      //   } catch {
-      //     res.status(500).json({ message: "Failed to update settings" });
-      //   }
-      // });
+      try {
+        const rows = await sql`
+          SELECT bs.*, s.category 
+          FROM booking_settings as bs 
+          LEFT JOIN shops as s ON s.id = bs.shop_id 
+          WHERE bs.shop_id=${shopId}
+        `;
+
+        const s = rows[0];
+
+        if (!s) {
+          return res.status(404).json({ message: "Settings not found" });
+        }
+
+        return res.json({
+          store_name: s.store_name || "",
+          store_description: s.store_description || "",
+          store_address: s.store_address || "",
+          store_phone: s.store_phone || "",
+          store_email: s.store_email || "",
+          store_hours: s.store_hours || "",
+          store_open_time: s.store_open_time || "10:00",
+          store_close_time: s.store_close_time || "19:00",
+          store_closed_days: s.store_closed_days || "",
+          banner_url: s.banner_url || "",
+          staff_selection_enabled: s.staff_selection_enabled || false,
+          table_count: s.table_count != null ? String(s.table_count) : "0",
+          max_party_size: s.max_party_size != null ? String(s.max_party_size) : "0",
+          shop_category: s.category,
+          closed_dow: s.closed_dow || "",
+          closed_newyear: s.closed_newyear || false
+        });
+
+      } catch (e: any) {
+        console.error("settings error:", e);
+        res.status(500).json({ message: "Failed to fetch settings" });
+      }
+    });
 
       app.put("/api/shops/:shopId/settings", async (req, res) => {
         const shopId = parseInt(req.params.shopId);
@@ -1363,6 +1408,7 @@ export function ensureSetup(): Promise<void> {
 
         try {
           const s = req.body;
+          const ny = s.closed_newyear === true || s.closed_newyear === "true";
           
           // 1. まず現在のレコードが存在するか確認（なければ初期値で作成）
           const exists = await sql`SELECT 1 FROM booking_settings WHERE shop_id = ${shopId}`;
@@ -1374,20 +1420,19 @@ export function ensureSetup(): Promise<void> {
                 shop_id, store_name, store_description, store_address, store_phone,
                 store_email, store_hours, store_closed_days, banner_url,
                 staff_selection_enabled, table_count, max_party_size,
-                store_open_time, store_close_time,
+                store_open_time, store_close_time,closed_dow,closed_newyear,
                 updated_at
               ) VALUES (
                 ${shopId}, ${s.store_name || ""}, ${s.store_description || ""}, ${s.store_address || ""},
                 ${s.store_phone || ""}, ${s.store_email || ""}, ${s.store_hours || ""},
                 ${s.store_closed_days || ""}, ${s.banner_url || ""}, ${s.staff_selection_enabled || false},
                 ${parseInt(s.table_count || "0", 10)}, ${parseInt(s.max_party_size || "0", 10)}, 
-                ${s.store_open_time || "10:00"}, ${s.store_close_time || "19:00"},
+                ${s.store_open_time || "10:00"}, ${s.store_close_time || "19:00"}, ${s.closed_dow || ""},${ny},
                 NOW()
               )
             `;
           } else {
             // 2. データがある場合は、送られてきた項目のみをUPDATE
-            // これなら、送られてこなかった項目は元の値が維持されます
             if (s.store_name !== undefined) await sql`UPDATE booking_settings SET store_name = ${s.store_name} WHERE shop_id = ${shopId}`;
             if (s.store_description !== undefined) await sql`UPDATE booking_settings SET store_description = ${s.store_description} WHERE shop_id = ${shopId}`;
             if (s.store_address !== undefined) await sql`UPDATE booking_settings SET store_address = ${s.store_address} WHERE shop_id = ${shopId}`;
@@ -1401,7 +1446,8 @@ export function ensureSetup(): Promise<void> {
             if (s.max_party_size !== undefined) await sql`UPDATE booking_settings SET max_party_size = ${parseInt(s.max_party_size, 10)} WHERE shop_id = ${shopId}`;
             if (s.store_open_time !== undefined) await sql`UPDATE booking_settings SET store_open_time = ${s.store_open_time} WHERE shop_id = ${shopId}`;
             if (s.store_close_time !== undefined) await sql`UPDATE booking_settings SET store_close_time = ${s.store_close_time} WHERE shop_id = ${shopId}`;
-            
+            if (s.closed_dow !== undefined) await sql`UPDATE booking_settings SET closed_dow = ${s.closed_dow} WHERE shop_id = ${shopId}`;
+            if (s.closed_newyear !== undefined) await sql`UPDATE booking_settings SET closed_newyear = ${s.closed_newyear} WHERE shop_id = ${shopId}`;
             await sql`UPDATE booking_settings SET updated_at = NOW() WHERE shop_id = ${shopId}`;
           }
 
