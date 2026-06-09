@@ -224,11 +224,11 @@ export default function ListPage() {
         <footer className="text-center py-4 mt-4">
           <Link href={basePath}>
             <span className="text-xs font-bold text-primary cursor-pointer" data-testid="link-footer-home">
-              神奈川おでかけナビ
+              かながわスマイルマップ
             </span>
           </Link>
           <p className="text-[10px] text-muted-foreground mt-1">
-            &copy; 2026 神奈川おでかけナビ
+            &copy; 2026 かながわスマイルマップ
           </p>
         </footer>
       )}
