@@ -154,11 +154,11 @@ function LineHeader() {
 
   const isHome = location === "/app";
   const getTitle = () => {
-    if (isHome) return "神奈川おでかけナビ";
+    if (isHome) return "かながわスマイルマップ";
     if (location.startsWith("/app/list")) return "お店一覧";
     if (location.startsWith("/app/shop/")) return "お店詳細";
     if (location.startsWith("/app/reservation/")) return "予約";
-    return "神奈川おでかけナビ";
+    return "かながわスマイルマップ";
   };
 
   return (
@@ -222,15 +222,16 @@ function LineBottomBar() {
 }
 
 export default function LineAppFrame({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
-  const isHome = location === "/app";
+  // const [location] = useLocation();
+  // const isHome = location === "/app";
   return (
     <div className="h-dvh bg-gray-800 flex items-start justify-center md:py-8 md:px-4 overflow-hidden" data-testid="line-app-frame">
       <div className="w-full md:max-w-[375px] md:rounded-[2.5rem] md:overflow-hidden md:shadow-2xl md:border-4 md:border-gray-700 relative bg-background h-full md:h-[min(812px,calc(100dvh-4rem))] flex flex-col">
         <div className="hidden md:block">
           <LineStatusBar />
         </div>
-        {!isHome && <LineHeader />}
+        {/* {!isHome && <LineHeader />} */}
+        <LineHeader />
         <div className="flex-1 overflow-y-auto overflow-x-hidden" data-testid="line-app-content">
           {children}
         </div>

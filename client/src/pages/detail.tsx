@@ -488,11 +488,11 @@ export default function DetailPage() {
           <div className="max-w-3xl mx-auto text-center">
             <Link href={basePath}>
               <span className="text-sm font-bold text-primary cursor-pointer" data-testid="link-footer-detail-home">
-                神奈川おでかけナビ
+                かながわスマイルマップ
               </span>
             </Link>
             <p className="text-xs text-muted-foreground mt-2">
-              &copy; 2026 神奈川おでかけナビ All Rights Reserved.
+              &copy; 2026 かながわスマイルマップ All Rights Reserved.
             </p>
           </div>
         </footer>

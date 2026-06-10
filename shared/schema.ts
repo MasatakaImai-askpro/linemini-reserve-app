@@ -220,6 +220,8 @@ export const bookingSettings = pgTable("booking_settings", {
   maxPartySize:         integer("max_party_size").default(0),
   storeOpenTime:        text("store_open_time").default("10:00"),
   storeCloseTime:       text("store_close_time").default("19:00"),
+  closedDow:            text("closed_dow").default(""),
+  closedNewyear:        boolean("closed_newyear").default(false),
   createdAt:            timestamp("created_at").defaultNow(),
   updatedAt:            timestamp("updated_at").defaultNow(),
 });

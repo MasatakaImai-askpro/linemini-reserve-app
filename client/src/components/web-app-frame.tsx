@@ -110,7 +110,7 @@ export function WebAppFrame({ children }: { children: ReactNode }) {
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center shadow-sm">
               <span className="text-sm text-white font-bold">西</span>
             </div>
-            <span className="font-bold text-sm text-gray-900 hidden sm:block">神奈川おでかけナビ</span>
+            <span className="font-bold text-sm text-gray-900 hidden sm:block">かながわスマイルマップ</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">
@@ -179,8 +179,8 @@ export function WebAppFrame({ children }: { children: ReactNode }) {
 
       <footer className="bg-white border-t py-6 mt-4">
         <div className="max-w-6xl mx-auto px-4 text-center">
-          <p className="font-bold text-primary text-sm mb-1">神奈川おでかけナビ</p>
-          <p className="text-xs text-muted-foreground">&copy; 2026 神奈川おでかけナビ</p>
+          <p className="font-bold text-primary text-sm mb-1">かながわスマイルマップ</p>
+          <p className="text-xs text-muted-foreground">&copy; 2026 かながわスマイルマップ</p>
         </div>
       </footer>
 

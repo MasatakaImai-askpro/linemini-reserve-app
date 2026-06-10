@@ -48,28 +48,29 @@ const categoryIcons: Record<string, any> = {
 
 function HeroSection({ isWeb }: { isWeb?: boolean }) {
   return (
-    <div className={`relative w-full overflow-hidden ${isWeb ? "h-[260px]" : "h-[160px]"}`}>
+    <div className={`relative w-full overflow-hidden ${isWeb ? "h-[260px]" : "h-[180px]"}`}>
       <img
         src="/images/hero-kanagawa.png"
         alt="Kanagawa"
         className="absolute inset-0 w-full h-full object-cover"
         style={{ transform: "scaleX(-1)" }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/60" />
-      <div className="relative z-10 flex flex-col items-center justify-center h-full px-4 text-center">
-        <Badge
-          variant="secondary"
-          className="mb-2 bg-white/20 text-white border-white/30 backdrop-blur-sm text-[10px] px-2 py-0.5"
-          data-testid="badge-portal-label"
-        >
-          <MapPin className="w-2.5 h-2.5 mr-0.5" />
-          神奈川県全域・静岡県東部
-        </Badge>
+      <div className="absolute inset-0 bg-gradient-to-t from-amber-900/90 via-amber-800/60 via-[45%] to-transparent" />
+      <div className="relative z-10 flex flex-col justify-end h-full px-4 pb-10">
+        <div className="mb-1.5">
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/20 backdrop-blur-sm text-[10px] font-bold text-white border border-white/20"
+            data-testid="badge-portal-label"
+          >
+            <MapPin className="w-2.5 h-2.5" />
+            神奈川県全域・静岡県東部
+          </span>
+        </div>
         <h1
           className={`font-bold text-white mb-1 tracking-tight ${isWeb ? "text-3xl" : "text-lg"}`}
           data-testid="text-hero-title"
         >
-          神奈川おでかけナビ
+          かながわスマイルマップ
         </h1>
         <p
           className={`text-white/80 leading-relaxed ${isWeb ? "text-sm mt-1" : "text-[10px]"}`}
@@ -650,6 +651,7 @@ export default function HomePage() {
 
   // LINEID取得のロジック
   // ※必要に応じてコメントアウト解除してください（ローカル環境だとうまく動かない為）
+  // const liffId = (import.meta.env?.VITE_LIFF_ID as string) ?? "";
 
   // localStorage.removeItem("liff_profile");
   // if (!isWeb) {
@@ -657,7 +659,7 @@ export default function HomePage() {
   //   useEffect(() => {
   //       const initLiff = async () => {
   //         try {
-  //           await liff.init({ liffId: "2009341857-tmEtN0SB" });
+  //           await liff.init({ liffId: liffId });
   //           if (!liff.isLoggedIn()) {
   //             liff.login();
   //           } else {
@@ -768,7 +770,7 @@ export default function HomePage() {
         <footer className="bg-card border-t py-4 px-3">
           <div className="text-center">
             <p className="font-bold text-primary text-xs mb-1" data-testid="text-footer-title">
-              神奈川おでかけナビ
+              かながわスマイルマップ
             </p>
             <p className="text-[10px] text-muted-foreground mb-2">
               神奈川県全域・静岡県東部エリアの商店街・組合加盟店のポータルサイト
@@ -783,7 +785,7 @@ export default function HomePage() {
               ))}
             </div>
             <p className="text-[10px] text-muted-foreground mt-3">
-              &copy; 2026 神奈川おでかけナビ
+              &copy; 2026 かながわスマイルマップ
             </p>
           </div>
         </footer>
