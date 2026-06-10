@@ -584,7 +584,7 @@ async function sendLineFlexMessage(lineId: string, lineMessageData: any, token: 
 
 async function sendEmailMessage(lineMessageData: any, token: string, isRequest:boolean) {
   const transporter = nodemailer.createTransport({
-    host: "smtp.office365.com",
+    host: process.env.EMAIL_HOST,
     port: 587,
     secure: false,
     auth: {
@@ -592,7 +592,6 @@ async function sendEmailMessage(lineMessageData: any, token: string, isRequest:b
       pass: process.env.EMAIL_PASS,
     },
     tls: {
-      ciphers: "SSLv3",
       rejectUnauthorized: false,
     },
   });
@@ -621,18 +620,22 @@ async function sendEmailMessage(lineMessageData: any, token: string, isRequest:b
     };
   const htmlToSend = template(htmlData);
 
-  // 送信
-  await transporter.sendMail({
-    from: '"予約システム" <n.tamura@askpro.co.jp>',
-    to: lineMessageData.customer_email,
-    subject: title,
-    html: htmlToSend,
-  });
+  try {
+    const result = await transporter.sendMail({
+      from: `"予約システム" <${process.env.EMAIL_USER}>`,
+      to: lineMessageData.customer_email,
+      subject: title,
+      html: htmlToSend,
+    });
+    console.log("Mail sent:", result.messageId);
+  } catch (err) {
+    console.error("Mail error:", err);
+}
 }
 
 async function sendEmailToStore(lineMessageData: any, isRequest: boolean) {
   const transporter = nodemailer.createTransport({
-    host: "smtp.office365.com",
+    host: process.env.EMAIL_HOST,
     port: 587,
     secure: false,
     auth: {
@@ -640,7 +643,6 @@ async function sendEmailToStore(lineMessageData: any, isRequest: boolean) {
       pass: process.env.EMAIL_PASS,
     },
     tls: {
-      ciphers: "SSLv3",
       rejectUnauthorized: false,
     },
   });
@@ -669,12 +671,17 @@ async function sendEmailToStore(lineMessageData: any, isRequest: boolean) {
   const htmlToSend = template(htmlData);
 
   // 送信
-  await transporter.sendMail({
-    from: '"予約システム" <n.tamura@askpro.co.jp>',
-    to: lineMessageData.shop_email,
-    subject: title,
-    html: htmlToSend,
-  });
+  try {
+    const result = await transporter.sendMail({
+      from: `"予約システム" <${process.env.EMAIL_USER}>`,
+      to: lineMessageData.shop_email,
+      subject: title,
+      html: htmlToSend,
+    });
+    console.log("Mail sent:", result.messageId)
+  } catch(err) {
+    console.log("Mail error", err)
+  }
 }
 
 export function ensureSetup(): Promise<void> {
