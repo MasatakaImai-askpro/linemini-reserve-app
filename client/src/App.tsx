@@ -23,9 +23,9 @@ import liff from '@line/liff';
 import VConsole from 'vconsole';
 
 // スマホ開発用コンソール
-if (process.env.NODE_ENV === 'development') {
-  const vConsole = new VConsole();
-}
+// if (process.env.NODE_ENV === 'development') {
+//   const vConsole = new VConsole();
+// }
 
 // ─── ページラッパー（トップレベルで定義してReact Hooks順序を固定） ───
 function AppHome() {
