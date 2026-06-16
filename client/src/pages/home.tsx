@@ -651,28 +651,28 @@ export default function HomePage() {
 
   // LINEID取得のロジック
   // ※必要に応じてコメントアウト解除してください（ローカル環境だとうまく動かない為）
-  // const liffId = (import.meta.env?.VITE_LIFF_ID as string) ?? "";
+  const liffId = (import.meta.env?.VITE_LIFF_ID as string) ?? "";
 
-  // localStorage.removeItem("liff_profile");
-  // if (!isWeb) {
+  localStorage.removeItem("liff_profile");
+  if (!isWeb) {
     
-  //   useEffect(() => {
-  //       const initLiff = async () => {
-  //         try {
-  //           await liff.init({ liffId: liffId });
-  //           if (!liff.isLoggedIn()) {
-  //             liff.login();
-  //           } else {
-  //             const userProfile = await liff.getProfile();
-  //             localStorage.setItem("liff_profile", JSON.stringify(userProfile));
-  //           }
-  //         } catch (err) {
-  //           console.error("LIFF失敗", err);
-  //         }
-  //       };
-  //       initLiff();
-  //     }, []);
-  // }
+    useEffect(() => {
+        const initLiff = async () => {
+          try {
+            await liff.init({ liffId: liffId });
+            if (!liff.isLoggedIn()) {
+              liff.login();
+            } else {
+              const userProfile = await liff.getProfile();
+              localStorage.setItem("liff_profile", JSON.stringify(userProfile));
+            }
+          } catch (err) {
+            console.error("LIFF失敗", err);
+          }
+        };
+        initLiff();
+      }, []);
+  }
 
   const handleSearch = (area: string, category: string, keyword: string) => {
     const params = new URLSearchParams();
