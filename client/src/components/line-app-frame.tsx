@@ -235,7 +235,7 @@ export default function LineAppFrame({ children }: { children: ReactNode }) {
         <div className="flex-1 overflow-y-auto overflow-x-hidden" data-testid="line-app-content">
           {children}
         </div>
-        <LineBottomBar />
+        {/* <LineBottomBar /> */}
       </div>
     </div>
   );
