@@ -365,7 +365,7 @@ async function sendLineFlexMessage(lineId: string, lineMessageData: any, token: 
                     action: {
                       type: "uri",
                       label: "予約をキャンセルする",
-                      uri: `https://domain/app/cancel/${lineMessageData.shop_id}/${token}`
+                      uri: `https://kanagawa-smilemap.jp/app/cancel/${lineMessageData.shop_id}/${token}`
                     }
                   },
                   {
