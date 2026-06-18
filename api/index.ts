@@ -209,7 +209,7 @@ let _setup: Promise<void> | null = null;
 
 // ─── 予約完了メッセージ送信ロジック ───
 async function sendLineFlexMessage(lineId: string, lineMessageData: any, token: string, isRequest: boolean) {
-  const accessToken = 'DHKMhlfcGdViCvlTpkYev/MIYW5KDb638DfsA8H2B+Zw76puYKcaZHp4UPAUCKwp0cgW71DzySHTVyljlISnuWx0QWN+6ClWxK1bbunMEqLHpVjnI+r9x7ACCPQAB1GBmbUVui5TuWectUrbZ1H1zAdB04t89/1O/w1cDnyilFU=';
+  const accessToken = process.env.MESSAGE_API_ACCESS_TOKEN;
   const url = 'https://api.line.me/v2/bot/message/push';
 
   const [y, m, d] = lineMessageData.date.split("-");
