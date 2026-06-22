@@ -633,6 +633,42 @@ async function sendEmailMessage(lineMessageData: any, token: string, isRequest:b
 }
 }
 
+async function sendIdPassMessageToAdmin(lineMessageData: any) {
+  const transporter = nodemailer.createTransport({
+    host: process.env.EMAIL_HOST,
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
+
+  const templatePath = path.join(process.cwd(), 'server/mail_templates/login_info.html');
+  const title = "ユーザ名、パスワード発行完了"
+
+  const source = fs.readFileSync(templatePath, 'utf8');
+
+  // 変数を流し込む
+  const template = handlebars.compile(source);
+  const htmlToSend = template(lineMessageData);
+
+  try {
+    const result = await transporter.sendMail({
+      from: `"予約システム" <${process.env.EMAIL_USER}>`,
+      to: process.env.ADMIN_EMAIL,
+      subject: title,
+      html: htmlToSend,
+    });
+    console.log("Mail sent:", result.messageId);
+  } catch (err) {
+    console.error("Mail error:", err);
+}
+}
+
 async function sendEmailToStore(lineMessageData: any, isRequest: boolean) {
   const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
@@ -771,6 +807,7 @@ export function ensureSetup(): Promise<void> {
         try {
           const b = req.body;
           const slug = b.slug || crypto.randomUUID().replace(/-/g, "").slice(0, 10);
+          const rawPassword =crypto.randomUUID().replace(/-/g, "").slice(0, 8);
 
           //トランザクション開始
           await sql`BEGIN`;
@@ -819,19 +856,45 @@ export function ensureSetup(): Promise<void> {
             ON CONFLICT (shop_id) DO NOTHING
           `;
 
+          const saltRounds = 10;
+          const pwHash = await bcrypt.hash(rawPassword, saltRounds);
+
+          await sql`
+            INSERT INTO users (
+              username, password_hash, role, shop_id
+            ) VALUES (
+              ${newShop.slug}, ${pwHash}, 'shop_admin', ${newShop.id}
+            )
+          `;
+
           // すべて成功したらコミット
           await sql`COMMIT`;
 
           // 最新の店舗情報を取得して返却
           const updatedRows = await sql`SELECT * FROM shops WHERE id = ${newShop.id}`;
-          res.status(201).json(toShop(updatedRows[0]));
+          const sendMessageData = {
+            "username": slug,
+            "password": rawPassword,
+            "shopname": newShop.name
+          }
+          sendIdPassMessageToAdmin(sendMessageData).catch((err) => {
+            console.error("【メール送信失敗】管理者へのメール送信に失敗しました:", err);
+          });
+          // メールが送信できなかった場合の為にログを残す
+          console.log(`【アカウント自動発行】ユーザ名: ${slug} / パスワード: ${rawPassword}`);
 
+          res.status(201).json({
+            shop: toShop(updatedRows[0]),
+            generatedAccount: {
+              username:slug,
+              password: rawPassword,
+              shopName: newShop.name
+            }
+          })
         } catch (e: any) {
-          // どこか一箇所でもエラーが起きたら、ここへ飛んでロールバック
           await sql`ROLLBACK`.catch((err) => console.error("Rollback failed:", err));
-          
-          console.error("shop create transaction error:", e);
-          res.status(500).json({ message: "Failed to create shop and settings" });
+          console.error("shop and user auto-create transaction error:", e);
+          res.status(500).json({ message: "Failed to create shop and settings and admin user" });
         }
       });
 
