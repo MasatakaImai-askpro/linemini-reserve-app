@@ -327,13 +327,13 @@ export function CourseSelect({ shopId, stripeConnectId, stripeConnectStatus, onS
                     <div className="text-sm text-foreground">{settings.store_phone || "-"}</div>
                   </div>
                 </div>
-                <div className="flex items-start gap-3 px-4 py-3">
+                {/* <div className="flex items-start gap-3 px-4 py-3">
                   <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   <div>
                     <div className="text-xs text-muted-foreground">メール</div>
                     <div className="text-sm text-foreground">{settings.store_email || "-"}</div>
                   </div>
-                </div>
+                </div> */}
                 <div className="flex items-start gap-3 px-4 py-3">
                   <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   <div>
