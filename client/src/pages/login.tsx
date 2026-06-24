@@ -23,7 +23,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
             <MapPin className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">かながわおでかけナビ</h1>
+          <h1 className="text-2xl font-bold text-foreground">かながわスマイルマップ</h1>
           <p className="text-sm text-muted-foreground mt-1">管理ポータル</p>
         </div>
 
