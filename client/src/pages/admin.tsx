@@ -414,7 +414,7 @@ function AddShopDialog({ open, onClose }: { open: boolean; onClose: () => void }
 
   const createShopMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/shops", {
+      const res = await apiRequest("POST", "/api/shops", {
         name,
         description,
         area,
@@ -425,10 +425,25 @@ function AddShopDialog({ open, onClose }: { open: boolean; onClose: () => void }
         imageUrl: "/images/shop-default.png",
         displayOrder: 0,
       });
+      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/shops"] });
-      toast({ title: "店舗を追加しました" });
+      const { username, password } = data.generatedAccount;
+      toast({ 
+        title: "店舗を追加しました",
+        description: (
+          <div>
+            <p>【管理者アカウント】</p>
+            <p className="font-mono bg-muted p-1 my-1 rounded">
+              ID: {username} <br />
+              PW: {password}
+            </p>
+            <p className="text-xs text-destructive mt-1">(この画面を閉じると再表示できません)</p>
+          </div>
+        ),
+        duration: 20000, 
+      });
       setName(""); setDescription(""); setArea(""); setCategory(""); setSubcategory("");
       setAddress(""); setPhone("");
       onClose();
